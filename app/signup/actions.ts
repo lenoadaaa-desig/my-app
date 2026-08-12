@@ -1,6 +1,8 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
+import { signUpSchema } from "@/modules/auth/auth.schema";
+import * as authService from "@/modules/auth/auth.service";
+import { MESSAGES } from "@/constants/messages";
 
 export type SignupFormState = { error: string } | { message: string } | undefined;
 
@@ -8,23 +10,21 @@ export async function signup(
   _state: SignupFormState,
   formData: FormData
 ): Promise<SignupFormState> {
-  const email = formData.get("email");
-  const password = formData.get("password");
+  const parsed = signUpSchema.safeParse({
+    email: formData.get("email"),
+    password: formData.get("password"),
+    name: formData.get("name"),
+    phone: formData.get("phone"),
+  });
 
-  if (typeof email !== "string" || typeof password !== "string") {
-    return { error: "Email and password are required." };
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? MESSAGES.auth.signUpFailed };
   }
 
-  if (password.length < 8) {
-    return { error: "Password must be at least 8 characters long." };
+  const result = await authService.signUp(parsed.data);
+  if (!result.success) {
+    return { error: result.error.message };
   }
 
-  const supabase = await createClient();
-  const { error } = await supabase.auth.signUp({ email, password });
-
-  if (error) {
-    return { error: error.message };
-  }
-
-  return { message: "Check your email to confirm your account." };
+  return { message: MESSAGES.auth.signUpSuccess };
 }

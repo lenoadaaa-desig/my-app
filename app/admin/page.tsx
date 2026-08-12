@@ -1,13 +1,9 @@
-import { redirect } from "next/navigation";
-import { getProfile, type Profile } from "@/lib/dal";
+import { requireRole, type Profile } from "@/lib/dal";
 import { createClient } from "@/lib/supabase/server";
 import { AdminUserTable } from "./admin-user-table";
 
 export default async function AdminPage() {
-  const profile = await getProfile();
-  if (profile.role !== "admin") {
-    redirect("/dashboard");
-  }
+  const profile = await requireRole("admin");
 
   const supabase = await createClient();
   const { data: users } = await supabase

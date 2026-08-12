@@ -10,6 +10,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `npm run build` — production build
 - `npm run start` — serve the production build
 - `npm run lint` — ESLint (flat config via `eslint-config-next`)
+- `npm run db:generate` — regenerate the Prisma client
+- `npm run db:migrate -- --name <name>` — create + apply a dev migration (never use `prisma db push` — no migration file to track)
+- `npm run db:pull` — introspect the live DB (e.g. `-- --print` to compare without overwriting `schema.prisma`)
+- `npm run db:studio` / `npm run db:seed`
+
+All `db:*` scripts wrap the Prisma CLI with `dotenv-cli` reading `.env.local` — never run `npx prisma` directly (see "ข้อจำกัดเวอร์ชัน" below).
 
 There is no test runner configured in this project.
 
@@ -74,21 +80,18 @@ Prisma CLI อ่าน `.env.local` ไม่ได้ ต้องเรีย
 
 ## ปัญหาค้างที่ยังไม่แก้
 
-- Role type ใน `lib/dal.ts` ยังเป็น `"user" | "admin"` ไม่ตรง enum จริง
+- Role type ใน `lib/dal.ts` ยังเป็น `"user" | "admin"` ไม่ตรง enum จริง (DB enum คือ `customer`/`owner`/`admin` แล้ว)
 - `admin-user-table.tsx` dropdown ยังเป็น user/admin
 - role check กระจายอยู่ 2 จุด (`app/admin/page.tsx`, `app/admin/actions.ts`)
-- `.env.local` ยังขาด `DATABASE_URL`, `DIRECT_URL`, `SUPABASE_SERVICE_ROLE_KEY`
-- ยังไม่ยืนยันว่า `supabase/schema.sql` ถูก apply ลง DB จริงหรือยัง
-- ตาราง `reservations` ยังไม่มีฟิลด์ `slot_time`, `party_size`
-  และยังไม่มีตาราง `opening_hours`, `booking_settings`, `closures`
+- `.env.local` ยังขาด `SUPABASE_SERVICE_ROLE_KEY` (`DATABASE_URL`/`DIRECT_URL` เติมแล้ว)
+- `supabase/rls-and-triggers.sql` เขียนเสร็จแล้วแต่ **ยังไม่ได้ apply ลง DB จริง** —
+  จนกว่าจะ apply ทุกตารางจะเป็น RLS เปิดแบบไม่มี policy (deny-all แม้แต่ SELECT)
 - `Profile` ไม่มี FK ไป `auth.users` ต้องมีฟังก์ชันลบ user
   ที่ลบทั้ง `auth.users` และ `profiles` พร้อมกัน (ทำใน Task 2)
 - `updated_at` อัปเดตเฉพาะเมื่อแก้ผ่าน Prisma
   แก้ผ่าน SQL ตรง ๆ จะไม่ขยับ
-
-## งานถัดไป
-
-ขั้น A: หลังผมเติม env ครบ ให้ `prisma db pull` เพื่อดูว่า DB จริงมีอะไร
+- ยังไม่มีโค้ดสร้าง `profiles` row ตอน signup (เดิมพึ่ง `handle_new_user` trigger
+  แต่ตัดสินใจแล้วว่าให้สร้างในโค้ดแทน — ยังไม่ได้ทำ, Task 2)
 
 ## Architecture
 
@@ -98,7 +101,7 @@ TableNow — an online restaurant table-booking / queue system. Next.js App Rout
 - `app/globals.css` — Tailwind CSS v4 (via `@tailwindcss/postcss`, no `tailwind.config.*` — v4 is configured through CSS).
 - Path alias `@/*` maps to the repo root (`tsconfig.json`).
 
-**Target architecture** (see "Project rules" below) moves app data access from direct Supabase table calls onto Prisma + a `modules/` service layer, and expands the role model from two roles to three (`CUSTOMER`, `OWNER`, `ADMIN`). This is not yet reflected in the code described in the rest of this section — treat the sections below as the current implementation, and the rules section as the direction new work should take it.
+**Target architecture** (see "Project rules" below) moves app data access from direct Supabase table calls onto Prisma + a `modules/` service layer, and expands the role model from two roles to three (`CUSTOMER`, `OWNER`, `ADMIN`). The database side of this is done — Prisma owns the schema (see "Database" below) and the DB enum already has all three roles — but the application code hasn't caught up: `modules/` is still empty, `lib/dal.ts` still uses the old 2-role type and reads `profiles` via the Supabase client rather than Prisma. Treat the rest of this section as the current implementation, and the rules section as the direction new work should take it.
 
 ### Auth (Supabase SSR via `@supabase/ssr`)
 
@@ -109,9 +112,11 @@ TableNow — an online restaurant table-booking / queue system. Next.js App Rout
 
 ### Database
 
-`supabase/schema.sql` is currently the hand-maintained source of truth for `public.profiles` (mirrors `auth.users`, adds `role`), an `is_admin()` `security definer` helper (avoids RLS self-recursion), RLS policies, and a trigger that inserts a profile row on signup. There is no self-service role-change path; promoting the first admin requires the manual `update` statement commented at the bottom of the file. Requires `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` (see `.env.local`).
+Prisma owns the schema. `prisma/schema.prisma` defines 3 enums (`Role`→`user_role`, `RestaurantStatus`→`restaurant_status`, `BookingStatus`→`booking_status`) and 6 models (`Profile`→`profiles`, `Restaurant`→`restaurants`, `Booking`→`bookings`, `OpeningHour`→`opening_hours`, `BookingSetting`→`booking_settings`, `Closure`→`closures`), all mapped to snake_case tables/columns via `@@map`/`@map`. Migration `prisma/migrations/20260812103854_init` is applied to the live DB.
 
-Per the project rules below, this is being migrated to **Prisma-owned schema** — `supabase/` SQL becomes limited to RLS policies and database functions only, with `prisma/schema.prisma` as the actual source of truth for table shape. Prisma is not yet installed (not in `package.json`); there is no `prisma/` directory yet.
+`supabase/rls-and-triggers.sql` holds what Prisma can't express: SELECT-only RLS policies (see the file's header comment for why writes are deliberately not covered — all writes go through API routes + Prisma, which bypasses RLS), the `auth_user_role()` security-definer helper, and the `protect_profile_role`/`protect_restaurant_approval` triggers. Re-apply it in full (Supabase SQL Editor or `psql "$DIRECT_URL" -f supabase/rls-and-triggers.sql`) after any migration that changes table shape. **As of the last migration it had been written but not yet applied** — until it is, every table has RLS enabled with zero policies (Supabase's project default), i.e. deny-all even for `SELECT`.
+
+Auth needs `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY`; Prisma needs `DATABASE_URL` (pooled) / `DIRECT_URL` (direct) — all four are in `.env.local`. `SUPABASE_SERVICE_ROLE_KEY` is still missing, needed for `lib/supabase/admin.ts` and the not-yet-written profile-creation/deletion code (see "ปัญหาค้างที่ยังไม่แก้").
 
 ### UI components
 
@@ -121,17 +126,17 @@ shadcn/ui is configured via `components.json`: style `base-nova` on Base UI prim
 
 ## Target folder structure
 
-No `src/` — top-level dirs under `my-app/`. `modules/`, `types/`, `constants/`, and `prisma/` don't exist yet and should be created as this work lands.
+No `src/`. `modules/`, `types/`, `constants/` exist but are still empty — no business-logic files have been written yet.
 
 ```
 app/           pages + API routes
 components/    ui/ (shadcn) + app-specific components
-lib/           prisma.ts, supabase/, api-response.ts, datetime.ts
-modules/       business logic, one subtree per feature   ← to be created
-types/                                                    ← to be created
-constants/                                                ← to be created
-prisma/        schema.prisma, seed.ts                     ← to be created
-supabase/      SQL migrations for RLS / db functions only
+lib/           prisma.ts, supabase/, api-response.ts, dal.ts, utils.ts
+modules/       business logic, one subtree per feature   ← empty, not yet used
+types/                                                    ← empty, not yet used
+constants/                                                ← empty, not yet used
+prisma/        schema.prisma, migrations/20260812103854_init
+supabase/      rls-and-triggers.sql — RLS policies / security-definer functions / triggers only
 ```
 
 Import everything via the `@/` alias, e.g. `@/lib/prisma`, `@/modules/booking/booking.service`.
@@ -140,7 +145,7 @@ Import everything via the `@/` alias, e.g. `@/lib/prisma`, `@/modules/booking/bo
 
 These govern all new work in this repo, independent of what's already implemented:
 
-1. **Prisma owns the schema.** Never change tables via the Supabase Dashboard. `supabase/migrations/` is for RLS policies and database functions only.
+1. **Prisma owns the schema.** Never change tables via the Supabase Dashboard. `supabase/rls-and-triggers.sql` is for RLS policies and database functions only.
 2. **Prisma only touches the `public` schema.** Never add a model or migration that reaches into Supabase's `auth` schema.
 3. `Profile.id` is a UUID and must equal `auth.users.id`.
 4. **`Profile.role` is the source of truth for role**, synced to `app_metadata`. Never use `user_metadata` for role — it's client-writable.

@@ -115,7 +115,7 @@ create or replace function public.protect_restaurant_approval()
 returns trigger
 language plpgsql
 security definer
-set search_path = ''
+set search_path = public, pg_temp
 as $$
 begin
   if new.status <> old.status

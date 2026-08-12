@@ -18,6 +18,32 @@ export default function SignupPage() {
         </h1>
 
         <div className="flex flex-col gap-1">
+          <label htmlFor="name" className="text-sm text-zinc-600 dark:text-zinc-400">
+            ชื่อ-นามสกุล
+          </label>
+          <input
+            id="name"
+            name="name"
+            type="text"
+            required
+            className="rounded border border-black/[.08] bg-transparent px-3 py-2 text-sm dark:border-white/[.145]"
+          />
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <label htmlFor="phone" className="text-sm text-zinc-600 dark:text-zinc-400">
+            เบอร์โทรศัพท์
+          </label>
+          <input
+            id="phone"
+            name="phone"
+            type="tel"
+            required
+            className="rounded border border-black/[.08] bg-transparent px-3 py-2 text-sm dark:border-white/[.145]"
+          />
+        </div>
+
+        <div className="flex flex-col gap-1">
           <label htmlFor="email" className="text-sm text-zinc-600 dark:text-zinc-400">
             Email
           </label>

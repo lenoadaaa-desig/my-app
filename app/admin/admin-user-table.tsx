@@ -49,7 +49,8 @@ export function AdminUserTable({
                 }
                 className="rounded border border-black/[.08] bg-transparent px-2 py-1 text-sm disabled:opacity-50 dark:border-white/[.145]"
               >
-                <option value="user">user</option>
+                <option value="customer">customer</option>
+                <option value="owner">owner</option>
                 <option value="admin">admin</option>
               </select>
             </td>
