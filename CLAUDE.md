@@ -4,6 +4,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 @AGENTS.md
 
+## กฎที่ต้องรักษาตลอดโปรเจกต์
+
+- Commit ได้เมื่อจบงานแต่ละ task
+- ห้าม `git push` โดยไม่ได้รับอนุญาต ต้องถามก่อนทุกครั้ง
+- ห้าม `git rebase`, `git reset --hard`, force push ทุกกรณี
+
 ## Commands
 
 - `npm run dev` — start the dev server (Turbopack, default port 3000)
