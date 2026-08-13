@@ -21,4 +21,39 @@ export const MESSAGES = {
     unauthorized: "กรุณาเข้าสู่ระบบก่อนใช้งาน",
     forbidden: "คุณไม่มีสิทธิ์เข้าถึงส่วนนี้",
   },
+
+  restaurant: {
+    nameRequired: "กรุณากรอกชื่อร้าน",
+    categoryRequired: "กรุณาเลือกประเภทร้าน",
+    invalidQuery: "พารามิเตอร์การค้นหาไม่ถูกต้อง",
+
+    notFound: "ไม่พบร้านนี้",
+    forbidden: "คุณไม่มีสิทธิ์แก้ไขร้านนี้",
+    adminCannotCreate:
+      "แอดมินไม่สามารถลงทะเบียนร้านได้ เนื่องจากแอดมินเป็นผู้อนุมัติร้าน หากต้องการเปิดร้านจริง กรุณาสมัครบัญชีแยกต่างหาก",
+
+    createFailed: "ลงทะเบียนร้านไม่สำเร็จ กรุณาลองใหม่อีกครั้ง",
+    createSuccess: "ลงทะเบียนร้านสำเร็จ กรุณารอการอนุมัติจากแอดมิน",
+
+    updateFailed: "แก้ไขข้อมูลร้านไม่สำเร็จ กรุณาลองใหม่อีกครั้ง",
+    updateSuccess: "แก้ไขข้อมูลร้านสำเร็จ",
+  },
+
+  admin: {
+    reviewReasonRequired: "กรุณาระบุเหตุผลเมื่อปฏิเสธร้าน",
+    restaurantNotFound: "ไม่พบร้านนี้",
+    reviewFailed: "ดำเนินการไม่สำเร็จ กรุณาลองใหม่อีกครั้ง",
+    reviewSuccess: "ดำเนินการสำเร็จ",
+    invalidTransition: (current: string, allowed: string[]) =>
+      allowed.length > 0
+        ? `สถานะปัจจุบันคือ "${current}" ไม่สามารถเปลี่ยนเป็นสถานะนี้ได้ (เปลี่ยนได้เฉพาะเป็น: ${allowed.join(", ")})`
+        : `สถานะปัจจุบันคือ "${current}" ไม่สามารถเปลี่ยนสถานะได้อีก`,
+  },
 } as const;
+
+export const RESTAURANT_STATUS_LABELS_TH: Record<string, string> = {
+  PENDING: "รอตรวจสอบ",
+  APPROVED: "อนุมัติแล้ว",
+  REJECTED: "ถูกปฏิเสธ",
+  SUSPENDED: "ถูกระงับ",
+};
