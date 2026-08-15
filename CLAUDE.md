@@ -31,6 +31,24 @@ slot.engine.ts เป็น pure function
 ห้าม import prisma และห้ามเรียก new Date() ข้างใน
 ต้องรับ now เข้ามาเป็น parameter เพื่อให้เทสได้
 
+เทส concurrency ต้อง bump connection_limit ใน process ของเทสเอง
+DATABASE_URL ปกติมี connection_limit=1 ซึ่งทำให้ Prisma Client
+คิวคำขอที่ฝั่ง client ก่อนถึง DB
+-> เทส race จะผ่านแม้ไม่มีล็อกเลย (false pass)
+ทุกครั้งที่เขียนเทส concurrency ใหม่ ต้องพิสูจน์ด้วยว่า
+ถอดกลไกกันชนออกแล้วเทส fail จริง
+(ตัวอย่างจริงที่ `modules/booking/booking.service.test.ts` —
+bump `connection_limit` ผ่าน dynamic import ก่อน `lib/prisma.ts`
+ถูกสร้าง, และ `createBooking`'s advisory lock ถูกปิดชั่วคราวเพื่อยืนยัน
+ว่าเทสจับ overbooking ได้จริงก่อนจะกู้กลับ)
+
+`server-only` ไม่มีอยู่จริงใน node_modules — Next.js alias ให้เองตอน
+build/dev เท่านั้น (ผ่าน "react-server" export condition) Vitest ไม่มี
+alias นี้ ต้อง alias เฉพาะใน `vitest.config.ts` ไปที่
+`vitest-server-only-stub.ts` เท่านั้น — ห้ามใส่ alias นี้ใน
+`next.config.ts` หรือ `tsconfig.json` เด็ดขาด ไม่งั้น guard ตัวจริง
+(กันไฟล์อย่าง `lib/supabase/admin.ts` หลุดเข้า client bundle) จะไม่ทำงานอีกเลย
+
 `lib/datetime.ts`:
 - `BANGKOK_UTC_OFFSET_MINUTES` เป็นค่าคงที่ +7 ใช้ได้เพราะไทยไม่มี DST
   ถ้าวันหนึ่งรองรับร้านนอกประเทศไทย ต้องรื้อ `lib/datetime.ts` ใหม่ทั้งไฟล์
@@ -97,6 +115,19 @@ Prisma CLI อ่าน `.env.local` ไม่ได้ ต้องเรีย
 7. `proxy.ts` คือ auth guard (ไม่ใช่ `middleware.ts`)
    เช็คแค่ login แล้วหรือยัง ไม่เช็ค role
    ความปลอดภัยจริงอยู่ที่ `requireRole` ใน `lib/dal.ts`
+
+8. กันจองเกินที่นั่งด้วย `pg_advisory_xact_lock` (2-key) เท่านั้น
+   ห้ามใช้ `pg_advisory_lock` (session-scoped)
+   เหตุผล: `DATABASE_URL` วิ่งผ่าน Supabase PgBouncer แบบ transaction pooling
+   ซึ่งสลับ physical connection ทุก transaction ไม่ใช่ทุก session
+   ถ้าใช้ lock แบบ session-scoped, unlock อาจไปออกที่ connection คนละตัว
+   กับตอน lock — Postgres ปลด session lock ได้เฉพาะบน connection เดิมที่ถือมันไว้
+   เท่านั้น เท่ากับ lock ค้างถาวรจนกว่า connection นั้นจะหลุด
+   (สุดท้ายรอบที่มันคุมจะ "เต็ม" ค้างตลอดไป)
+   `_xact_` variant ปลดเองตอน COMMIT/ROLLBACK บน connection เดียวกัน จึงไม่ค้าง
+   ดูโค้ดจริงที่ `modules/booking/booking.service.ts` (`createBooking`)
+   พอถือ advisory lock แล้ว ห้ามใส่ `FOR UPDATE` ซ้อนบน `bookings` อีก —
+   lock ตัวเดียวคุม writer ทุกตัวของ slot นั้นอยู่แล้ว
 
 ## ปัญหาค้างที่ยังไม่แก้
 
