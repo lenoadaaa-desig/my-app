@@ -20,10 +20,24 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `npm run db:migrate -- --name <name>` — create + apply a dev migration (never use `prisma db push` — no migration file to track)
 - `npm run db:pull` — introspect the live DB (e.g. `-- --print` to compare without overwriting `schema.prisma`)
 - `npm run db:studio` / `npm run db:seed`
+- `npm test` — run the test suite once (Vitest)
+- `npm run test:watch` — Vitest in watch mode
 
 All `db:*` scripts wrap the Prisma CLI with `dotenv-cli` reading `.env.local` — never run `npx prisma` directly (see "ข้อจำกัดเวอร์ชัน" below).
 
-There is no test runner configured in this project.
+Test runner: Vitest (Next 16 แนะนำอย่างเป็นทางการ)
+รันด้วย npm test
+slot.engine.ts เป็น pure function
+ห้าม import prisma และห้ามเรียก new Date() ข้างใน
+ต้องรับ now เข้ามาเป็น parameter เพื่อให้เทสได้
+
+`lib/datetime.ts`:
+- `BANGKOK_UTC_OFFSET_MINUTES` เป็นค่าคงที่ +7 ใช้ได้เพราะไทยไม่มี DST
+  ถ้าวันหนึ่งรองรับร้านนอกประเทศไทย ต้องรื้อ `lib/datetime.ts` ใหม่ทั้งไฟล์
+- `slot.engine.ts`'s `settings`: `capacityPerSlot` / `minLeadHours` / `advanceDays`
+  ติดลบ ไม่ทำให้ engine พัง (ไม่ hang, ไม่ throw) แต่ให้ผลลัพธ์ไร้สาระ
+  (capacity ติดลบ, lead-time เป็น no-op, advanceDays บล็อกทุกวัน)
+  ต้อง validate ค่าพวกนี้ที่ฟอร์มตั้งค่าร้าน (Task 7) — engine เองไม่กัน
 
 ## ข้อจำกัดเวอร์ชัน
 

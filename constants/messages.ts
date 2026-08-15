@@ -39,6 +39,20 @@ export const MESSAGES = {
     updateSuccess: "แก้ไขข้อมูลร้านสำเร็จ",
   },
 
+  booking: {
+    dateRequired: "กรุณาระบุวันที่",
+    invalidDateFormat: "รูปแบบวันที่ไม่ถูกต้อง กรุณาใช้รูปแบบ YYYY-MM-DD",
+    settingsMissing: "ร้านนี้ยังไม่ได้ตั้งค่าการจอง กรุณาติดต่อร้าน",
+
+    restaurantNotApproved: "ร้านนี้ไม่สามารถรับการจองได้ในขณะนี้",
+    slotNotAvailable: "ไม่สามารถจองรอบนี้ได้ กรุณาเลือกรอบอื่น",
+    partySizeInvalid: "จำนวนคนไม่ถูกต้อง",
+    partySizeExceedsMax: (max: number) => `จำนวนคนต้องไม่เกิน ${max} คน`,
+    slotFull: "รอบนี้เต็มแล้ว กรุณาเลือกรอบอื่น",
+    codeGenerationFailed: "ไม่สามารถสร้างรหัสการจองได้ กรุณาลองใหม่อีกครั้ง",
+    createFailed: "จองไม่สำเร็จ กรุณาลองใหม่อีกครั้ง",
+  },
+
   admin: {
     reviewReasonRequired: "กรุณาระบุเหตุผลเมื่อปฏิเสธร้าน",
     restaurantNotFound: "ไม่พบร้านนี้",
