@@ -39,6 +39,12 @@ export function calendarDateParts(date: Date): { year: number; month: number; da
   return { year: date.getUTCFullYear(), month: date.getUTCMonth(), day: date.getUTCDate() };
 }
 
+/** Inverse of parseCalendarDateString — formats a pure calendar date value back to "YYYY-MM-DD" via the same UTC y/m/d reading, so the round trip is exact. */
+export function formatCalendarDateString(date: Date): string {
+  const { year, month, day } = calendarDateParts(date);
+  return `${String(year).padStart(4, "0")}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
 /** Whole-day difference between two calendar dates, b - a. */
 export function calendarDaysBetween(
   a: { year: number; month: number; day: number },

@@ -25,6 +25,51 @@ export type Slot = {
   available: number;
 };
 
+type OpeningWindow = { openTime: string; closeTime: string };
+
+/**
+ * openMinutes/closeMinutes/crossesMidnight for one opening-hour row, with
+ * closeMinutes already extended past 1439 when the window crosses
+ * midnight. Single source of truth for "does this window cross midnight" —
+ * generateSlots (below) and resolveSlotStartMinutes both go through this,
+ * never re-derive crossesMidnight independently.
+ */
+function resolveOpeningWindow(openingHour: OpeningWindow): {
+  openMinutes: number;
+  closeMinutes: number;
+  crossesMidnight: boolean;
+} {
+  const openMinutes = timeStringToMinutes(openingHour.openTime);
+  let closeMinutes = timeStringToMinutes(openingHour.closeTime);
+  const crossesMidnight = closeMinutes < openMinutes;
+  if (crossesMidnight) {
+    closeMinutes += 24 * 60;
+  }
+  return { openMinutes, closeMinutes, crossesMidnight };
+}
+
+/**
+ * Inverse of the `time = minutesToTimeString(start)` step below: recovers
+ * the *unwrapped* minutes-since-midnight (may exceed 1439) a stored
+ * "HH:MM" slotTime represents, given the opening hours it was generated
+ * under. Needed because generateSlots wraps `start` back into 0-23:59 for
+ * display/storage — a booking's row only ever has the wrapped string, so
+ * anything that later needs the slot's *real instant* (e.g.
+ * changeBookingStatus's minLeadHours deadline) must unwrap it the same way
+ * it was wrapped, or a cross-midnight overflow slot like "01:00" gets
+ * misread as 01:00 *that same day* instead of the following one.
+ */
+export function resolveSlotStartMinutes(openingHour: OpeningWindow, slotTime: string): number {
+  const { openMinutes, crossesMidnight } = resolveOpeningWindow(openingHour);
+  const slotMinutes = timeStringToMinutes(slotTime);
+  return crossesMidnight && slotMinutes < openMinutes ? slotMinutes + 24 * 60 : slotMinutes;
+}
+
+/** The real instant a stored (bookingDate, slotTime) pair refers to. */
+export function computeSlotInstant(date: Date, openingHour: OpeningWindow, slotTime: string): Date {
+  return bangkokWallTimeToInstant(date, resolveSlotStartMinutes(openingHour, slotTime));
+}
+
 export function generateSlots(input: GenerateSlotsInput): Slot[] {
   const { openingHour, settings, date, now, isClosureDay, bookedMap } = input;
 
@@ -59,12 +104,7 @@ export function generateSlots(input: GenerateSlotsInput): Slot[] {
     return [];
   }
 
-  const openMinutes = timeStringToMinutes(openingHour.openTime);
-  let closeMinutes = timeStringToMinutes(openingHour.closeTime);
-  const crossesMidnight = closeMinutes < openMinutes;
-  if (crossesMidnight) {
-    closeMinutes += 24 * 60;
-  }
+  const { openMinutes, closeMinutes } = resolveOpeningWindow(openingHour);
 
   const leadMs = settings.minLeadHours * 60 * 60_000;
   const slots: Slot[] = [];

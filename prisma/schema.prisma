@@ -98,6 +98,10 @@ model Booking {
   code         String        @unique
   customerNote String?       @map("customer_note")
   status       BookingStatus @default(PENDING)
+  // Set on REJECTED (owner/admin) or CANCELLED (customer/admin) when a
+  // reason is given; never cleared by a later transition — same rule as
+  // Restaurant.rejectReason (Task 3).
+  statusReason String?       @map("status_reason")
   createdAt    DateTime      @default(now()) @map("created_at")
   updatedAt    DateTime      @updatedAt @map("updated_at")
 

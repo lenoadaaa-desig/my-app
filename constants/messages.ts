@@ -51,6 +51,19 @@ export const MESSAGES = {
     slotFull: "รอบนี้เต็มแล้ว กรุณาเลือกรอบอื่น",
     codeGenerationFailed: "ไม่สามารถสร้างรหัสการจองได้ กรุณาลองใหม่อีกครั้ง",
     createFailed: "จองไม่สำเร็จ กรุณาลองใหม่อีกครั้ง",
+
+    notFound: "ไม่พบการจองนี้",
+    forbidden: "คุณไม่มีสิทธิ์จัดการการจองนี้",
+    cancelDeadlinePassed: "เลยกำหนดเวลาที่จะยกเลิกด้วยตนเองแล้ว กรุณาติดต่อร้านโดยตรง",
+    restaurantIdRequired: "กรุณาระบุร้าน",
+    slotTimeRequired: "กรุณาระบุรอบเวลา",
+    invalidSlotTimeFormat: "รูปแบบเวลาไม่ถูกต้อง กรุณาใช้รูปแบบ HH:MM",
+    statusInvalid: "สถานะไม่ถูกต้อง",
+    invalidTransition: (current: string, allowed: string[]) =>
+      allowed.length > 0
+        ? `สถานะการจองปัจจุบันคือ "${current}" ไม่สามารถเปลี่ยนเป็นสถานะนี้ได้ (เปลี่ยนได้เฉพาะเป็น: ${allowed.join(", ")})`
+        : `สถานะการจองปัจจุบันคือ "${current}" ไม่สามารถเปลี่ยนสถานะได้อีก`,
+    statusUpdateFailed: "เปลี่ยนสถานะการจองไม่สำเร็จ กรุณาลองใหม่อีกครั้ง",
   },
 
   admin: {
@@ -70,4 +83,14 @@ export const RESTAURANT_STATUS_LABELS_TH: Record<string, string> = {
   APPROVED: "อนุมัติแล้ว",
   REJECTED: "ถูกปฏิเสธ",
   SUSPENDED: "ถูกระงับ",
+};
+
+export const BOOKING_STATUS_LABELS_TH: Record<string, string> = {
+  PENDING: "รอยืนยัน",
+  CONFIRMED: "ยืนยันแล้ว",
+  REJECTED: "ถูกปฏิเสธ",
+  CANCELLED: "ยกเลิกแล้ว",
+  CHECKED_IN: "เช็คอินแล้ว",
+  COMPLETED: "เสร็จสิ้น",
+  NO_SHOW: "ไม่มาตามนัด",
 };

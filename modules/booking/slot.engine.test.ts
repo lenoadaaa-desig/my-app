@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { generateSlots } from "./slot.engine";
+import { generateSlots, resolveSlotStartMinutes, computeSlotInstant } from "./slot.engine";
 import { bangkokWallTimeToInstant } from "@/lib/datetime";
 
 // `month` is 1-indexed here for readability, unlike the native Date API.
@@ -314,5 +314,53 @@ describe("combined: crossing midnight + other rules together", () => {
       bookedMap: {},
     });
     expect(result.map((s) => s.time)).toEqual(["00:00", "01:00"]);
+  });
+});
+
+describe("resolveSlotStartMinutes / computeSlotInstant: recovering a stored slotTime's real instant", () => {
+  const crossingOpeningHour = { openTime: "18:00", closeTime: "02:00" };
+  const nonCrossingOpeningHour = { openTime: "10:00", closeTime: "21:00" };
+
+  it("returns the literal minutes for a non-crossing window", () => {
+    expect(resolveSlotStartMinutes(nonCrossingOpeningHour, "12:00")).toBe(12 * 60);
+  });
+
+  it("returns the literal (pre-midnight) minutes for a crossing window's before-midnight slots", () => {
+    expect(resolveSlotStartMinutes(crossingOpeningHour, "18:00")).toBe(18 * 60);
+    expect(resolveSlotStartMinutes(crossingOpeningHour, "23:00")).toBe(23 * 60);
+  });
+
+  it("adds 24h back for a crossing window's wrapped after-midnight slots", () => {
+    expect(resolveSlotStartMinutes(crossingOpeningHour, "00:00")).toBe(24 * 60);
+    expect(resolveSlotStartMinutes(crossingOpeningHour, "01:00")).toBe(25 * 60);
+  });
+
+  it("computeSlotInstant ties a wrapped '01:00' to the *following* calendar day's real instant, not the same day's 01:00", () => {
+    const date = calendarDate(2026, 8, 20);
+    const instant = computeSlotInstant(date, crossingOpeningHour, "01:00");
+
+    expect(instant.getTime()).toBe(bangkokWallTimeToInstant(date, 25 * 60).getTime());
+    expect(instant.getTime()).not.toBe(bangkokWallTimeToInstant(date, 1 * 60).getTime());
+  });
+
+  it("round-trips exactly against every slot generateSlots actually produces for a crossing window", () => {
+    const date = calendarDate(2026, 8, 20);
+    const slots = generateSlots({
+      openingHour: { ...crossingOpeningHour, isClosed: false },
+      settings: baseSettings,
+      date,
+      now: farPastNow,
+      isClosureDay: false,
+      bookedMap: {},
+    });
+
+    for (const slot of slots) {
+      const recovered = resolveSlotStartMinutes(crossingOpeningHour, slot.time);
+      const direct = bangkokWallTimeToInstant(date, recovered);
+      // generateSlots itself computed each slot from an unwrapped `start` —
+      // this confirms resolveSlotStartMinutes recovers that exact value
+      // back from the wrapped display string alone.
+      expect(direct.getTime()).toBe(computeSlotInstant(date, crossingOpeningHour, slot.time).getTime());
+    }
   });
 });

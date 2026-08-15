@@ -105,6 +105,16 @@ Prisma CLI อ่าน `.env.local` ไม่ได้ ต้องเรีย
    source of truth คือตาราง `profiles`
    ห้ามเก็บ role ใน `user_metadata` (client แก้เองได้)
 
+   **การตัดสินสิทธิ์ต่อ resource ต้องใช้ความสัมพันธ์จริง
+   (`customerId` / `ownerId`) ไม่ใช่ `actor.role`
+   role ใช้ได้เฉพาะสิทธิ์ระดับระบบ (admin) เท่านั้น
+   เพราะ role ในระบบนี้เป็น monotonic — customer เลื่อนเป็น owner
+   แล้วกลับไม่ได้ ถ้าใช้ role ตัดสินจะกันคนออกจากสิ่งที่เขาควรทำได้**
+   (ตัวอย่างจริงที่เจอ: `changeBookingStatus` เดิม branch ด้วย `actor.role`
+   ทำให้ owner ยกเลิก booking ของตัวเอง (ในฐานะลูกค้าไปกินร้านอื่น) ไม่ได้เลย
+   แก้เป็น `isBookingOwner`/`isRestaurantOwner` แล้ว union สิทธิ์ — ดู
+   `modules/booking/booking.service.ts` เป็นตัวอย่าง pattern ที่ถูกต้อง)
+
 5. ขยาย `lib/dal.ts` ห้ามสร้าง `lib/auth.ts` แยก
    ต้องมีจุดตรวจสิทธิ์จุดเดียวในโปรเจกต์
 
@@ -125,7 +135,10 @@ Prisma CLI อ่าน `.env.local` ไม่ได้ ต้องเรีย
    เท่านั้น เท่ากับ lock ค้างถาวรจนกว่า connection นั้นจะหลุด
    (สุดท้ายรอบที่มันคุมจะ "เต็ม" ค้างตลอดไป)
    `_xact_` variant ปลดเองตอน COMMIT/ROLLBACK บน connection เดียวกัน จึงไม่ค้าง
-   ดูโค้ดจริงที่ `modules/booking/booking.service.ts` (`createBooking`)
+   ดูโค้ดจริงที่ `modules/booking/booking.service.ts` (`createBooking`
+   และ `changeBookingStatus` — สอง function ต้องคำนวณ lock key ตรงกันเป๊ะ
+   สำหรับ booking เดียวกัน ใช้ helper `bookingLockKey` ร่วมกัน ห้าม inline
+   string ซ้ำที่จุดใดจุดหนึ่งเฉย ๆ เพราะจะเสี่ยง key ไม่ตรงกันแล้ว lock ไม่ล็อกจริง)
    พอถือ advisory lock แล้ว ห้ามใส่ `FOR UPDATE` ซ้อนบน `bookings` อีก —
    lock ตัวเดียวคุม writer ทุกตัวของ slot นั้นอยู่แล้ว
 
@@ -163,7 +176,7 @@ TableNow — an online restaurant table-booking / queue system. Next.js App Rout
 
 ### Database
 
-Prisma owns the schema. `prisma/schema.prisma` defines 3 enums (`Role`→`user_role`, `RestaurantStatus`→`restaurant_status`, `BookingStatus`→`booking_status`) and 6 models (`Profile`→`profiles`, `Restaurant`→`restaurants`, `Booking`→`bookings`, `OpeningHour`→`opening_hours`, `BookingSetting`→`booking_settings`, `Closure`→`closures`), all mapped to snake_case tables/columns via `@@map`/`@map`. Migration `prisma/migrations/20260812103854_init` is applied to the live DB.
+Prisma owns the schema. `prisma/schema.prisma` defines 3 enums (`Role`→`user_role`, `RestaurantStatus`→`restaurant_status`, `BookingStatus`→`booking_status`) and 6 models (`Profile`→`profiles`, `Restaurant`→`restaurants`, `Booking`→`bookings`, `OpeningHour`→`opening_hours`, `BookingSetting`→`booking_settings`, `Closure`→`closures`), all mapped to snake_case tables/columns via `@@map`/`@map`. Migrations `prisma/migrations/20260812103854_init` and `20260815145650_add_booking_status_reason` (`Booking.statusReason`) are applied to the live DB.
 
 `supabase/rls-and-triggers.sql` holds what Prisma can't express: SELECT-only RLS policies (see the file's header comment for why writes are deliberately not covered — all writes go through API routes + Prisma, which bypasses RLS), the `auth_user_role()` security-definer helper, and the `protect_profile_role`/`protect_restaurant_approval` triggers. Re-apply it in full (Supabase SQL Editor or `psql "$DIRECT_URL" -f supabase/rls-and-triggers.sql`) after any migration that changes table shape. **As of the last migration it had been written but not yet applied** — until it is, every table has RLS enabled with zero policies (Supabase's project default), i.e. deny-all even for `SELECT`.
 
