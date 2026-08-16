@@ -239,6 +239,25 @@ Prisma CLI อ่าน `.env.local` ไม่ได้ ต้องเรีย
     ปัจจุบัน (2026-08-16) โปรเจกต์นี้ปิด Confirm email ไว้ที่ Supabase
     Dashboard สมัครเสร็จจะได้ session ทันทีและ redirect ไป dashboard เลย)
 
+11. **แก้เวลาทำการ/ลดที่นั่งที่กระทบการจองเดิม — เตือนแล้วให้บันทึกต่อได้
+    ไม่บล็อกและไม่ยกเลิกอัตโนมัติ** (Task 7 เฟส 1 รอบ 2 — ผู้ใช้ตัดสิน)
+    `PUT /api/restaurants/[id]/hours` และ `PUT /api/restaurants/[id]/settings`
+    ก่อนบันทึกจริงจะเช็คก่อนว่าการจองในอนาคตที่ยังไม่ resolve
+    (`SEAT_CONSUMING_STATUSES`: PENDING/CONFIRMED/CHECKED_IN) รายการไหนจะ
+    ขัดกับค่าใหม่บ้าง — เวลาทำการใหม่ทำให้ slotTime เดิมตกนอกช่วงเปิด
+    (หรือวันนั้นเพิ่งถูกปิด), หรือผลรวม partySize ต่อรอบเกิน
+    capacityPerSlot ใหม่, หรือ partySize ของรายการใดเกิน maxPartySize ใหม่
+    ถ้าเจอและ request ไม่ได้ส่ง `confirm: true` มา จะไม่บันทึกอะไรเลย
+    ตอบกลับ error code `CONFIRMATION_REQUIRED` (409) พร้อมจำนวนรายการที่
+    กระทบในข้อความ ฝั่ง client (ดู `app/owner/settings/owner-settings-form.tsx`)
+    ต้องเปิด dialog ให้เจ้าของร้านยืนยันแล้วส่งซ้ำพร้อม `confirm: true`
+    ถึงจะบันทึกจริง ไม่ว่ากรณีไหนการจองเดิมจะไม่ถูกยกเลิกหรือแก้ไขเอง
+    เหตุผล: เจ้าของร้านมีสิทธิ์ตัดสินใจเรื่องร้านตัวเอง ระบบมีหน้าที่แค่
+    เตือนให้รู้ตัวก่อนพลาด ไม่ใช่ตัดสินใจแทนหรือไปแตะข้อมูลการจองที่ลูกค้า
+    ทำไว้แล้วเฉยๆ ดู `countBookingsConflictingWithHours`/
+    `countBookingsConflictingWithSettings` ใน
+    `modules/restaurant/restaurant.service.ts`
+
 ## ปัญหาค้างที่ยังไม่แก้
 
 - Role type ใน `lib/dal.ts` ยังเป็น `"user" | "admin"` ไม่ตรง enum จริง (DB enum คือ `customer`/`owner`/`admin` แล้ว)

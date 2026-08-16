@@ -14,10 +14,19 @@ type ReviewAction = ReviewRestaurantInput["action"];
 
 // Explicit state machine, not nested ifs — booking status will need the same
 // shape (Task 5), so this is the pattern to reuse.
-const ALLOWED_TRANSITIONS: Record<RestaurantStatus, RestaurantStatus[]> = {
+//
+// Exported (Task 7 phase 1 round 2): REJECTED -> PENDING is never reached
+// through admin review itself (ACTION_TARGET_STATUS below only ever targets
+// APPROVED/REJECTED/SUSPENDED) — it exists for the owner-driven resubmit
+// flow (modules/restaurant/restaurant.service.ts's resubmitRestaurant),
+// which reuses this exact graph rather than declaring its own, so a
+// REJECTED restaurant's two ways forward (an admin approving it directly,
+// or its owner resubmitting for a fresh review) can never disagree about
+// what's legal from that state.
+export const ALLOWED_TRANSITIONS: Record<RestaurantStatus, RestaurantStatus[]> = {
   [RestaurantStatus.PENDING]: [RestaurantStatus.APPROVED, RestaurantStatus.REJECTED],
   [RestaurantStatus.APPROVED]: [RestaurantStatus.SUSPENDED],
-  [RestaurantStatus.REJECTED]: [RestaurantStatus.APPROVED],
+  [RestaurantStatus.REJECTED]: [RestaurantStatus.APPROVED, RestaurantStatus.PENDING],
   [RestaurantStatus.SUSPENDED]: [RestaurantStatus.APPROVED],
 };
 

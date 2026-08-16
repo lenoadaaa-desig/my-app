@@ -164,6 +164,93 @@ export const MESSAGES = {
     manageMyRestaurants: "จัดการร้านของฉัน",
   },
 
+  owner: {
+    // /owner/register — multi-step form, not returned by any service.
+    registerTitle: "ลงทะเบียนร้านอาหาร",
+    stepOf: (step: number, total: number) => `ขั้นตอน ${step} จาก ${total}`,
+    step1Title: "ข้อมูลร้าน",
+    step2Title: "ที่อยู่",
+    step3Title: "รูปปก",
+    step4Title: "ยืนยันข้อมูล",
+    nameLabel: "ชื่อร้าน",
+    categoryLabel: "หมวดหมู่",
+    descriptionLabel: "คำอธิบายร้าน",
+    phoneLabel: "เบอร์โทร",
+    addressLabel: "ที่อยู่",
+    coverImageLabel: "URL รูปปก",
+    coverImageHint: "วางลิงก์รูปภาพ — ยังไม่รองรับการอัปโหลดไฟล์โดยตรงในตอนนี้",
+    notProvided: "(ไม่ได้ระบุ)",
+    backButton: "ย้อนกลับ",
+    nextButton: "ถัดไป",
+    submitButton: "ยืนยันและส่งลงทะเบียน",
+    submitPending: "กำลังส่ง...",
+    reviewHeading: "ตรวจสอบข้อมูลก่อนส่ง",
+
+    // /owner/status
+    statusTitle: "สถานะการอนุมัติร้าน",
+    statusStepSubmitted: "ส่งแล้ว",
+    statusStepReviewing: "กำลังตรวจสอบ",
+    statusStepResult: "ผลลัพธ์",
+    statusPendingMessage: "ร้านของคุณอยู่ระหว่างการตรวจสอบจากแอดมิน กรุณารอการอนุมัติ",
+    statusApprovedMessage: "ร้านของคุณได้รับการอนุมัติแล้ว พร้อมเปิดให้จองแล้ว",
+    statusRejectedMessage: "ร้านของคุณถูกปฏิเสธ",
+    statusSuspendedMessage: "ร้านของคุณถูกระงับการใช้งาน",
+    rejectReasonLabel: "เหตุผล",
+    suspendedContactAdmin: "กรุณาติดต่อแอดมินเพื่อขอข้อมูลเพิ่มเติม",
+    editRestaurantInfo: "แก้ไขข้อมูลร้าน",
+    goToDashboard: "ไปที่แดชบอร์ด",
+    noRestaurantsYet: "คุณยังไม่มีร้านที่ลงทะเบียน",
+    registerNow: "ลงทะเบียนร้านเลย",
+    selectRestaurantLabel: "เลือกร้าน",
+
+    // /owner/settings
+    settingsTitle: "ตั้งค่าร้าน",
+    generalInfoTab: "ข้อมูลทั่วไป",
+    openingHoursTab: "เวลาทำการ",
+    bookingSettingsTab: "ตั้งค่าการจอง",
+    saveButton: "บันทึก",
+    savePending: "กำลังบันทึก...",
+    saveSuccess: "บันทึกสำเร็จ",
+    closedToggleLabel: "ปิดวันนี้",
+    slotDurationLabel: "ความยาวรอบ (นาที)",
+    capacityPerSlotLabel: "จำนวนที่นั่งต่อรอบ",
+    maxPartySizeLabel: "จำนวนคนสูงสุดต่อการจอง",
+    advanceDaysLabel: "จองล่วงหน้าได้กี่วัน",
+    minLeadHoursLabel: "ต้องจองล่วงหน้ากี่ชั่วโมง",
+    autoConfirmLabel: "ยืนยันการจองอัตโนมัติ",
+    slotDurationInvalid: "ความยาวรอบต้องมากกว่า 0 นาที",
+    capacityPerSlotInvalid: "จำนวนที่นั่งต่อรอบต้องมากกว่า 0",
+    maxPartySizeInvalid: "จำนวนคนสูงสุดต้องมากกว่า 0",
+    maxPartySizeExceedsCapacity: "จำนวนคนสูงสุดต่อการจองต้องไม่เกินจำนวนที่นั่งต่อรอบ",
+    advanceDaysInvalid: "จองล่วงหน้าต้องอย่างน้อย 1 วัน",
+    minLeadHoursInvalid: "ต้องจองล่วงหน้าอย่างน้อย 0 ชั่วโมง",
+    hoursTimeFormatInvalid: "รูปแบบเวลาไม่ถูกต้อง กรุณาใช้รูปแบบ HH:MM",
+    hoursZeroLengthInvalid: "เวลาเปิดและเวลาปิดต้องไม่เท่ากัน",
+    hoursCountInvalid: "ต้องระบุเวลาทำการให้ครบทั้ง 7 วัน",
+    hoursDaysInvalid: "ข้อมูลวันในสัปดาห์ไม่ถูกต้อง",
+
+    // Both endpoints check for future active bookings that would conflict
+    // with the new values before saving (PUT .../hours, PUT .../settings) —
+    // see modules/restaurant/restaurant.service.ts's
+    // countBookingsConflictingWithHours/countBookingsConflictingWithSettings
+    // and CLAUDE.md's architecture-decisions section for why this warns
+    // instead of blocking or auto-cancelling.
+    hoursConflictWarning: (count: number) =>
+      `การเปลี่ยนเวลาทำการนี้จะกระทบการจองที่มีอยู่แล้ว ${count} รายการ (อยู่นอกเวลาทำการใหม่) การจองเดิมจะไม่ถูกยกเลิก ยืนยันที่จะบันทึกหรือไม่?`,
+    settingsConflictWarning: (count: number) =>
+      `การเปลี่ยนค่านี้จะกระทบการจองที่มีอยู่แล้ว ${count} รายการ (เกินจำนวนที่นั่งใหม่) การจองเดิมจะไม่ถูกยกเลิก ยืนยันที่จะบันทึกหรือไม่?`,
+    confirmSaveWarningTitle: "คำเตือนก่อนบันทึก",
+    confirmSaveAnyway: "ยืนยันบันทึก",
+    confirmDialogCancel: "ยกเลิก",
+
+    // /owner/status — resubmit after REJECTED
+    resubmitButton: "ส่งตรวจอีกครั้ง",
+    resubmitConfirmTitle: "ยืนยันส่งตรวจอีกครั้ง?",
+    resubmitConfirmDescription: "ร้านของคุณจะกลับไปอยู่ในสถานะรอตรวจสอบ แอดมินจะตรวจสอบข้อมูลร้านอีกครั้ง",
+    resubmitPending: "กำลังส่ง...",
+    resubmitOnlyFromRejected: "ส่งตรวจใหม่ได้เฉพาะร้านที่ถูกปฏิเสธเท่านั้น",
+  },
+
   admin: {
     reviewReasonRequired: "กรุณาระบุเหตุผลเมื่อปฏิเสธร้าน",
     restaurantNotFound: "ไม่พบร้านนี้",
@@ -261,6 +348,7 @@ export const ERROR_MESSAGES_TH: Record<ErrorCode, string> = {
   VALIDATION_ERROR: "ข้อมูลที่กรอกไม่ถูกต้อง กรุณาตรวจสอบอีกครั้ง",
   SLOT_FULL: "รอบเวลานี้เต็มแล้ว กรุณาเลือกรอบอื่น",
   INVALID_STATE: "ไม่สามารถดำเนินการนี้ได้ในสถานะปัจจุบันของรายการ",
+  CONFIRMATION_REQUIRED: "การเปลี่ยนแปลงนี้กระทบการจองที่มีอยู่แล้ว กรุณายืนยันอีกครั้ง",
   SIGNUP_FAILED: "สมัครสมาชิกไม่สำเร็จ กรุณาลองใหม่อีกครั้ง",
   ROLE_UPDATE_FAILED: "เปลี่ยนบทบาทผู้ใช้ไม่สำเร็จ",
   DELETE_USER_FAILED: "ลบผู้ใช้ไม่สำเร็จ",
