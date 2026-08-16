@@ -115,7 +115,15 @@ export default function RestaurantsPage() {
           }}
         >
           <SelectTrigger className="sm:w-48">
-            <SelectValue placeholder={MESSAGES.restaurant.categoryFilterLabel} />
+            {/* Base UI's Select.Value renders the raw `value` by default
+                (unlike Radix, it does NOT auto-derive the matched Item's
+                label) — without this children-function, picking "ทุกหมวด"
+                would show the literal sentinel string "__all__" in the UI.
+                Real categories don't need a lookup since the category's own
+                name already is its display label. */}
+            <SelectValue placeholder={MESSAGES.restaurant.categoryFilterLabel}>
+              {(value: string) => (value === ALL_CATEGORIES ? MESSAGES.restaurant.categoryAllLabel : value)}
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value={ALL_CATEGORIES}>{MESSAGES.restaurant.categoryAllLabel}</SelectItem>

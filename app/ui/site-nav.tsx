@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 import { logout } from "@/app/actions";
 import type { Role } from "@/lib/dal";
 
-type NavLink = { href: string; label: string };
+type NavLink = { href: string; label: string; prefetch?: boolean };
 
 function buildNavLinks(role: Role | null): NavLink[] {
   const links: NavLink[] = [{ href: "/restaurants", label: MESSAGES.nav.searchRestaurants }];
@@ -20,7 +20,10 @@ function buildNavLinks(role: Role | null): NavLink[] {
   if (role === "owner") {
     // /owner/dashboard doesn't exist yet — the link is added ahead of the
     // page on purpose, per the task that requested this navigation.
-    links.push({ href: "/owner/dashboard", label: MESSAGES.nav.myRestaurants });
+    // prefetch={false}: Next.js's <Link> prefetches any href visible in the
+    // viewport by default in production, which 404s in the background for
+    // a route that isn't built yet. Remove this once the page exists.
+    links.push({ href: "/owner/dashboard", label: MESSAGES.nav.myRestaurants, prefetch: false });
   }
   if (role === "admin") {
     links.push({ href: "/admin", label: MESSAGES.nav.adminPanel });
@@ -39,6 +42,7 @@ export function SiteNav({ isLoggedIn, role }: { isLoggedIn: boolean; role: Role 
           <Link
             key={link.href}
             href={link.href}
+            prefetch={link.prefetch}
             className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}
           >
             {link.label}
@@ -90,6 +94,7 @@ export function SiteNav({ isLoggedIn, role }: { isLoggedIn: boolean; role: Role 
               <Link
                 key={link.href}
                 href={link.href}
+                prefetch={link.prefetch}
                 onClick={() => setOpen(false)}
                 className={cn(buttonVariants({ variant: "ghost" }), "justify-start")}
               >

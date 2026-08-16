@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, UtensilsCrossed } from "lucide-react";
 import { getProfileOrNull } from "@/lib/dal";
 import * as restaurantService from "@/modules/restaurant/restaurant.service";
 import { bangkokToday, calendarDayOfWeek } from "@/lib/datetime";
@@ -33,7 +33,7 @@ export default async function RestaurantDetailPage({
 
   return (
     <div className="flex-1 bg-canvas">
-      {restaurant.coverImage ? (
+      {restaurant.coverImage?.trim() ? (
         // Arbitrary external URL, no remotePatterns configured for next/image yet.
         // eslint-disable-next-line @next/next/no-img-element
         <img
@@ -42,7 +42,9 @@ export default async function RestaurantDetailPage({
           className="h-48 w-full object-cover sm:h-64"
         />
       ) : (
-        <div className="h-32 w-full bg-surface sm:h-40" aria-hidden="true" />
+        <div className="flex h-32 w-full items-center justify-center bg-surface sm:h-40" aria-hidden="true">
+          <UtensilsCrossed className="size-10 text-ink-mute" />
+        </div>
       )}
 
       <div className="mx-auto grid max-w-3xl gap-6 px-4 py-6 sm:px-6">

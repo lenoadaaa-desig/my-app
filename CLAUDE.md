@@ -10,6 +10,49 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - ห้าม `git push` โดยไม่ได้รับอนุญาต ต้องถามก่อนทุกครั้ง
 - ห้าม `git rebase`, `git reset --hard`, force push ทุกกรณี
 
+## สถานะงานปัจจุบัน (อัปเดต 16 ส.ค. 2026)
+
+เสร็จแล้ว:
+- Task 0-5: backend ครบทั้งระบบ 123 เทสผ่าน
+  schema + RLS + auth 3 บทบาท + ร้าน/อนุมัติ
+  + slot engine + createBooking (advisory lock)
+  + changeBookingStatus (relationship-based permission)
+- Task 6: ธีมครีมทอง + หน้าลูกค้า
+  /restaurants, /restaurants/[id], /bookings/my,
+  /dashboard, navigation ตาม role
+
+ยืนยันด้วยการทดสอบจริงในเบราว์เซอร์แล้ว:
+- จองสำเร็จได้รหัส BK-KDUCPB
+- ที่นั่งลดจาก 10 เหลือ 7 หลังจอง 3 คน (bookedMap ทำงานถูก)
+- responsive 375px ไม่แตก
+- isOpenNow จัดการร้านข้ามเที่ยงคืนถูกต้อง
+
+แก้ไปแล้วในรอบล่าสุด:
+- __all__ หลุดใน dropdown (Base UI Select.Value
+  ไม่ auto-derive label เหมือน Radix ต้องส่ง function)
+- placeholder รูปร้าน (ไอคอน UtensilsCrossed)
+- console 404 (มาจาก Link prefetch ไป /owner/dashboard
+  ที่ยังไม่มี แก้ด้วย prefetch={false} ชั่วคราว)
+- line-height ภาษาไทยกับ line-clamp (เพิ่ม leading-relaxed)
+
+กำลังทำ:
+- Task 7 หน้าเจ้าของร้าน (ยังไม่เริ่ม)
+
+ถัดไป:
+- Task 7 หน้าเจ้าของร้าน (ฟอร์มลงทะเบียน, ตั้งเวลาทำการ,
+  แดชบอร์ดจัดการการจองรายวัน)
+- Task 8 หน้าแอดมิน
+- Task 9 เก็บงาน
+
+ปัญหาค้าง:
+- ลิงก์ /owner/dashboard ใน site-nav ใส่ prefetch={false} ไว้
+  เมื่อ Task 7 สร้างหน้าจริงแล้วให้เอาออก
+
+ข้อมูลทดสอบ:
+- npm run seed:demo สร้างร้าน 3 ร้าน
+  id: d3a10000-0000-4000-8000-00000000000{1,2,3}
+- owner: leno.adaaa@gmail.com
+
 ## Commands
 
 - `npm run dev` — start the dev server (Turbopack, default port 3000)
