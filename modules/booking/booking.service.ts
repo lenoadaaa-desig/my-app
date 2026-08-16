@@ -399,11 +399,38 @@ export async function changeBookingStatus(
           );
         }
 
-        // 4) Self-cancel (by whoever the booking actually belongs to) has
+        // 4) CANCELLED initiated by the *restaurant owner*, on a booking
+        // that isn't their own (cancelling a customer's booking on their
+        // behalf — e.g. a phone call), must record why: unlike a
+        // self-cancel, there's otherwise no record of who made this call or
+        // what the customer actually said.
+        //
+        // `!isBookingOwner` matters here: an owner who booked at their own
+        // restaurant is *both* isRestaurantOwner and isBookingOwner, and
+        // cancelling their own booking there is still a self-cancel (same
+        // "union of permission sets" reasoning as everywhere else in this
+        // function) — it shouldn't suddenly demand a reason just because
+        // they also happen to own the restaurant.
+        //
+        // Gated on isRestaurantOwner specifically, not "not the customer"
+        // generally — admin already has its own unrestricted operational
+        // path through every status (no relationship check at all, see 1&2
+        // above) and wasn't asked to be held to this reason requirement
+        // too, so an admin-initiated CANCELLED stays exactly as permissive
+        // as every other admin-initiated transition. A genuine self-cancel
+        // (by the booking's own customer) keeps its reason optional,
+        // unchanged from before.
+        if (isRestaurantOwner && !isBookingOwner && nextStatus === BookingStatus.CANCELLED && !reason?.trim()) {
+          throw new BookingValidationError(ERROR_CODES.VALIDATION_ERROR, MESSAGES.booking.cancelReasonRequired);
+        }
+
+        // 5) Self-cancel (by whoever the booking actually belongs to) has
         // its own deadline: must be at least minLeadHours before the slot.
-        // Owner/admin-initiated changes (reject, no-show, etc.) are
-        // operational actions at or after the booking time and aren't
-        // subject to this.
+        // Owner/admin-initiated changes (reject, no-show, cancelling on the
+        // customer's behalf, etc.) are operational actions at or after the
+        // booking time and aren't subject to this — gated on isBookingOwner
+        // specifically, never on role, so it doesn't accidentally apply to
+        // an owner cancelling someone else's booking.
         if (isBookingOwner && nextStatus === BookingStatus.CANCELLED) {
           const [bookingSetting, openingHourRow] = await Promise.all([
             tx.bookingSetting.findUnique({ where: { restaurantId: booking.restaurantId } }),
@@ -532,11 +559,21 @@ export async function getMyBookings(customerId: string, filter: GetMyBookingsFil
   return { upcoming, history, cancelled };
 }
 
+// /owner/dashboard (Task 7 phase 2) needs the customer's name/phone on each
+// row, which the plain Booking row doesn't carry (Booking only has
+// customerId) — same reasoning as MY_BOOKINGS_INCLUDE above, just the
+// other side of the relation.
+const RESTAURANT_BOOKINGS_INCLUDE = {
+  customer: { select: { id: true, fullName: true, phone: true, email: true } },
+} satisfies Prisma.BookingInclude;
+
+export type RestaurantBooking = Prisma.BookingGetPayload<{ include: typeof RESTAURANT_BOOKINGS_INCLUDE }>;
+
 export async function getRestaurantBookings(
   restaurantId: string,
   ownerId: string,
   date?: string
-): Promise<ServiceResult<Booking[]>> {
+): Promise<ServiceResult<RestaurantBooking[]>> {
   const restaurant = await prisma.restaurant.findUnique({ where: { id: restaurantId } });
   if (!restaurant) {
     return { success: false, error: { code: ERROR_CODES.NOT_FOUND, message: MESSAGES.restaurant.notFound } };
@@ -559,6 +596,7 @@ export async function getRestaurantBookings(
 
   const bookings = await prisma.booking.findMany({
     where: { restaurantId, ...(bookingDate ? { bookingDate } : {}) },
+    include: RESTAURANT_BOOKINGS_INCLUDE,
     orderBy: { slotTime: "asc" },
   });
 

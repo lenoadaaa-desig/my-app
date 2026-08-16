@@ -57,7 +57,20 @@ export default async function OwnerSettingsPage({
         </div>
       )}
 
-      <OwnerSettingsForm restaurant={restaurant} />
+      {/* key forces a full remount when the selected restaurant changes —
+          GeneralInfoTab/OpeningHoursTab/BookingSettingsTab each seed local
+          form state from `restaurant` via useState(restaurant.field), which
+          (like dashboard-view.tsx's now-fixed bookings state) only runs on
+          mount. Without this key, switching restaurants via the selector's
+          <Link> (a same-path, search-param-only navigation) would keep
+          showing the previous restaurant's form values. Unlike the
+          dashboard's booking list, these forms hold genuine in-progress
+          edits, so "derive straight from the prop, no state" isn't an
+          option here — remounting on restaurant.id change is the correct
+          fix: it resets to the new restaurant's real values, and discarding
+          any unsaved edits for the restaurant you just navigated away from
+          is the expected behavior, not a bug. */}
+      <OwnerSettingsForm key={restaurant.id} restaurant={restaurant} />
     </div>
   );
 }

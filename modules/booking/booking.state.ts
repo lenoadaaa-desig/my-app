@@ -43,9 +43,18 @@ export const SEAT_CONSUMING_STATUSES: BookingStatus[] = ["PENDING", "CONFIRMED",
 // rather than listing all 7 statuses here.
 export const CUSTOMER_ALLOWED_TARGET_STATUSES: BookingStatus[] = ["CANCELLED"];
 
+// CANCELLED added here (Task 7 phase 2 round 2): a customer calling the
+// restaurant to cancel by phone is common, and without this the only status
+// staff could actually apply was REJECTED — conflating "restaurant declined
+// it" with "customer backed out", which corrupts whatever reporting reads
+// BookingStatus later. changeBookingStatus (booking.service.ts) requires a
+// reason whenever CANCELLED is reached by someone other than the booking's
+// own customer (owner or admin) — self-cancel (the customer) still has an
+// optional reason, same as before.
 export const OWNER_ALLOWED_TARGET_STATUSES: BookingStatus[] = [
   "CONFIRMED",
   "REJECTED",
+  "CANCELLED",
   "CHECKED_IN",
   "NO_SHOW",
   "COMPLETED",

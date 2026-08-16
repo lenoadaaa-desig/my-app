@@ -18,12 +18,7 @@ function buildNavLinks(role: Role | null): NavLink[] {
     links.push({ href: "/bookings/my", label: MESSAGES.nav.myBookings });
   }
   if (role === "owner") {
-    // /owner/dashboard doesn't exist yet — the link is added ahead of the
-    // page on purpose, per the task that requested this navigation.
-    // prefetch={false}: Next.js's <Link> prefetches any href visible in the
-    // viewport by default in production, which 404s in the background for
-    // a route that isn't built yet. Remove this once the page exists.
-    links.push({ href: "/owner/dashboard", label: MESSAGES.nav.myRestaurants, prefetch: false });
+    links.push({ href: "/owner/dashboard", label: MESSAGES.nav.myRestaurants });
   }
   if (role === "admin") {
     links.push({ href: "/admin", label: MESSAGES.nav.adminPanel });

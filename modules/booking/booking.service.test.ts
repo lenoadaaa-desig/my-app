@@ -504,6 +504,74 @@ describe("changeBookingStatus: permissions", () => {
   });
 });
 
+describe("changeBookingStatus: owner-initiated cancellation (Task 7 phase 2 round 2)", () => {
+  it("owner cancelling their own restaurant's booking succeeds with a reason", async () => {
+    const restaurant = await createTestRestaurant();
+    const customerId = await createTestCustomer();
+    const booking = await createTestBooking(restaurant.id, customerId, { status: BookingStatus.CONFIRMED });
+    const owner: TestActor = { id: restaurant.ownerId, email: null, role: "owner" };
+
+    const result = await changeBookingStatus(booking.id, owner, BookingStatus.CANCELLED, "ลูกค้าโทรมาแจ้งยกเลิก");
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data.status).toBe(BookingStatus.CANCELLED);
+    expect(result.data.statusReason).toBe("ลูกค้าโทรมาแจ้งยกเลิก");
+  });
+
+  it("owner cancelling without a reason gets VALIDATION_ERROR", async () => {
+    const restaurant = await createTestRestaurant();
+    const customerId = await createTestCustomer();
+    const booking = await createTestBooking(restaurant.id, customerId, { status: BookingStatus.CONFIRMED });
+    const owner: TestActor = { id: restaurant.ownerId, email: null, role: "owner" };
+
+    const result = await changeBookingStatus(booking.id, owner, BookingStatus.CANCELLED);
+
+    expect(result).toEqual({ success: false, error: { code: "VALIDATION_ERROR", message: expect.any(String) } });
+  });
+
+  it("owner of a different restaurant cancelling gets FORBIDDEN, even with a reason", async () => {
+    const restaurantA = await createTestRestaurant();
+    const restaurantB = await createTestRestaurant();
+    const customerId = await createTestCustomer();
+    const bookingOnB = await createTestBooking(restaurantB.id, customerId, { status: BookingStatus.CONFIRMED });
+    const ownerA: TestActor = { id: restaurantA.ownerId, email: null, role: "owner" };
+
+    const result = await changeBookingStatus(bookingOnB.id, ownerA, BookingStatus.CANCELLED, "some reason");
+
+    expect(result).toEqual({ success: false, error: { code: "FORBIDDEN", message: expect.any(String) } });
+  });
+
+  it("owner cancelling after minLeadHours has passed still succeeds — unlike a customer self-cancel", async () => {
+    const restaurant = await createTestRestaurant({ minLeadHours: 4 });
+    const customerId = await createTestCustomer();
+
+    // Same near-future fixture shape as the customer-deadline test above —
+    // 1 hour out, well inside the 4h minLeadHours window.
+    const nearInstant = new Date(Date.now() + 60 * 60 * 1000);
+    const parts = toBangkokParts(nearInstant);
+    const bookingDate = new Date(Date.UTC(parts.year, parts.month, parts.day));
+    const slotTime = minutesToTimeString(parts.minutesSinceMidnight);
+
+    const booking = await prisma.booking.create({
+      data: {
+        restaurantId: restaurant.id,
+        customerId,
+        bookingDate,
+        slotTime,
+        partySize: 2,
+        code: randomBookingCode(),
+        status: BookingStatus.CONFIRMED,
+      },
+    });
+    const owner: TestActor = { id: restaurant.ownerId, email: null, role: "owner" };
+
+    const result = await changeBookingStatus(booking.id, owner, BookingStatus.CANCELLED, "ลูกค้าโทรมาแจ้งยกเลิก");
+
+    expect(result.success, "owner-initiated cancel is not subject to the customer self-cancel deadline").toBe(true);
+  });
+});
+
 describe("changeBookingStatus: relationship-based permissions (not actor.role)", () => {
   it("an owner who booked at someone else's restaurant can cancel their own booking (previously broken by role-based gating)", async () => {
     const ownRestaurant = await createTestRestaurant();

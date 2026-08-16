@@ -9,6 +9,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Commit ได้เมื่อจบงานแต่ละ task
 - ห้าม `git push` โดยไม่ได้รับอนุญาต ต้องถามก่อนทุกครั้ง
 - ห้าม `git rebase`, `git reset --hard`, force push ทุกกรณี
+- ห้ามรัน `npm run build` ขณะที่ `npm run dev` กำลังทำงานอยู่
+  ทั้งสองคำสั่งเขียน `.next/` คนละชุดแต่ใช้โฟลเดอร์ร่วมกัน
+  ทำให้ dev server ที่รันอยู่เสิร์ฟ manifest/RSC payload
+  ปนกันคนละรุ่น อาการคือบางส่วนของหน้าแสดงข้อมูลถูก
+  อีกส่วนว่างเปล่าโดยไม่มี error ใด ๆ
+  เสียเวลาไล่หาบั๊กที่ไม่มีอยู่จริง
+
+  ก่อนรัน build ต้องหยุด dev server ก่อนเสมอ
+  ถ้าเจออาการข้อมูลหน้าเว็บไม่ตรงกับ DB ให้สงสัยเรื่องนี้ก่อน
+  ลอง `rm -rf .next/dev` แล้วสตาร์ท dev ใหม่
 
 ## สถานะงานปัจจุบัน (อัปเดต 16 ส.ค. 2026)
 
@@ -257,6 +267,50 @@ Prisma CLI อ่าน `.env.local` ไม่ได้ ต้องเรีย
     ทำไว้แล้วเฉยๆ ดู `countBookingsConflictingWithHours`/
     `countBookingsConflictingWithSettings` ใน
     `modules/restaurant/restaurant.service.ts`
+
+    ตัวเลขในคำเตือน CONFIRMATION_REQUIRED เป็น snapshot
+    ตอนตรวจครั้งแรก ไม่นับใหม่ตอน confirm
+    ตั้งใจให้เป็นแบบนี้ เพราะการนับใหม่แล้วเตือนซ้ำ
+    จะวนไม่รู้จบถ้ามีคนจองเข้ามาเรื่อย ๆ
+    ตัวเลขนี้เป็นข้อมูลประกอบการตัดสินใจ ไม่ใช่ตัวบล็อก
+    ไม่มีความเสียหายต่อข้อมูล การจองเดิมไม่ถูกแตะต้อง
+
+12. **CANCELLED เกิดได้จาก 2 ทาง: ลูกค้ายกเลิกเอง หรือเจ้าของร้านยกเลิกแทน
+    (ลูกค้าโทรมาแจ้ง)** แยกได้จาก statusReason ที่บังคับใส่เฉพาะฝั่ง
+    เจ้าของร้าน ถ้าวันหนึ่งต้องการสถิติแยกชัดเจน ต้องเพิ่มคอลัมน์
+    cancelledBy ผ่าน migration (Task 7 เฟส 2 รอบ 2 — ผู้ใช้ตัดสิน)
+    `OWNER_ALLOWED_TARGET_STATUSES` (`modules/booking/booking.state.ts`)
+    มี CANCELLED อยู่ด้วยแล้ว — `changeBookingStatus`
+    (`modules/booking/booking.service.ts`) บังคับ `reason` เมื่อ CANCELLED
+    ถูกสั่งโดย `isRestaurantOwner && !isBookingOwner` เท่านั้น (เจ้าของร้าน
+    ที่ไม่ใช่เจ้าของ booking เอง) — ไม่ใช่แค่ "ไม่ใช่เจ้าของ booking" เฉยๆ
+    เพราะ owner ที่จองร้านตัวเองก็เป็นทั้งสองอย่างพร้อมกัน กรณีนั้นยังนับเป็น
+    self-cancel เหมือนเดิม (reason optional) และแอดมินก็ไม่ถูกบังคับด้วย
+    (แอดมินมีสิทธิ์ไม่ผูกกับความสัมพันธ์อยู่แล้ว ไม่ได้ถูกสั่งให้ต้องใส่
+    reason เพิ่ม) deadline `minLeadHours` ผูกกับ `isBookingOwner` เท่านั้น
+    (ไม่ใช่ role) จึงใช้กับแค่ลูกค้ายกเลิกเอง เจ้าของร้าน/แอดมินยกเลิกแทน
+    ไม่ติด deadline นี้อยู่แล้วโดยไม่ต้องแก้อะไร
+
+13. ห้ามใช้ `useState(propจาก server)` แล้วหวังว่าจะ sync เอง
+    ตอน client-side navigation Next.js ไม่ remount component
+    ค่า state จะค้างเป็นชุดเก่าโดยไม่มี error
+    ให้ใช้ prop ตรง ๆ หรือ key prop ให้ remount แทน
+    (พบจริงที่ `/owner/dashboard` — เปลี่ยนร้าน/วันที่ผ่าน `?restaurantId=`
+    /`?date=` เป็น search-param-only navigation บน path เดิม ไม่ remount
+    component ตัวเลขสรุปค้างเป็นของร้าน/วันที่ก่อนหน้า ยืนยันด้วย Next 16
+    docs เอง — `router.bfcacheId` "stays the same for ... search-param- or
+    hash-only navigations" และแนะนำ "prefer resetting state explicitly ...
+    or deriving a key from your data" ไม่ใช่พึ่ง `bfcacheId`
+    แก้แล้วที่ `app/owner/dashboard/dashboard-view.tsx` (อ่าน
+    `initialBookings` prop ตรง ๆ ไม่มี `useState` คัดลอกอีก, action ที่แก้ไข
+    ข้อมูลจริงเรียก `router.refresh()` แทนการ patch state เอง) และ
+    `app/owner/settings/page.tsx` (`<OwnerSettingsForm key={restaurant.id}>`
+    — หน้านี้ฟอร์มมีการแก้ไขจริงฝั่ง client เลยต้องใช้ key ให้ remount แทน
+    การอ่าน prop ตรง ๆ อย่างเดียว)
+    ที่ตรวจแล้วไม่ติดปัญหานี้: `/restaurants` (client-owned filter+fetch
+    ทั้งหน้า ไม่มี state คัดลอกจาก prop เลย), `/bookings/my` (ไม่มี query
+    param ที่เปลี่ยนได้ระหว่างอยู่หน้าเดิม แท็บเป็น client UI state ล้วน),
+    `/owner/status` (ไม่มี client component ไหนคัดลอกข้อมูลร้านลง state)
 
 ## ปัญหาค้างที่ยังไม่แก้
 
