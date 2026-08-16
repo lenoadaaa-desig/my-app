@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent } from "@/components/ui/card";
 import { BookingStatusBadge } from "@/components/booking-status-badge";
-import { MESSAGES, ERROR_MESSAGES_TH, DAY_OF_WEEK_SHORT_TH } from "@/constants/messages";
+import { MESSAGES, ERROR_MESSAGES_TH, DAY_OF_WEEK_SHORT_TH, MONTH_SHORT_TH } from "@/constants/messages";
 import {
   bangkokToday,
   calendarDayOfWeek,
@@ -17,7 +17,7 @@ import {
   formatCalendarDateString,
   parseCalendarDateString,
 } from "@/lib/datetime";
-import { computeSlotInstant, type Slot } from "@/modules/booking/slot.engine";
+import { computeSlotInstant, resolveSlotBookability, type Slot } from "@/modules/booking/slot.engine";
 import { cn } from "@/lib/utils";
 
 type OpeningHourRow = { dayOfWeek: number; openTime: string; closeTime: string; isClosed: boolean };
@@ -121,34 +121,84 @@ export function BookingBox({ restaurantId, restaurantStatus, openingHours, isLog
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDateValue, isClosedThisDay]);
 
-  function slotState(slot: Slot) {
+  // Single source of truth for "can this fetched slot actually be booked
+  // right now" — shared with modules/booking/booking.service.ts's own
+  // capacity/lead-time logic via resolveSlotBookability, so the UI's
+  // decision can never drift from the server's. Re-evaluated on every
+  // render (partySize/nowTick both feed it), not cached, since either can
+  // make a previously-bookable slot stop being bookable.
+  function bookabilityOf(slot: Slot) {
     const instant = computeSlotInstant(
       selectedDate,
       openingHourForDay ?? { openTime: "00:00", closeTime: "00:00" },
       slot.time
     );
-    const isPast = instant.getTime() <= nowTick;
-    const isFull = slot.available <= 0;
-    const insufficientForParty = !isFull && slot.available < partySize;
-    const disabled = isPast || isFull || insufficientForParty;
+    return resolveSlotBookability(slot, partySize, instant, new Date(nowTick));
+  }
 
-    let label = MESSAGES.booking.slotSeatsRemaining(slot.available);
-    let labelClass = "text-ink-soft";
-    if (isPast) {
-      label = MESSAGES.booking.slotPastBadge;
-      labelClass = "text-ink-mute";
-    } else if (isFull) {
-      label = MESSAGES.booking.slotFullBadge;
-      labelClass = "text-bad";
-    } else if (insufficientForParty) {
-      labelClass = "text-ink-mute";
+  // Derived, not stored: if the previously-clicked slot is no longer
+  // bookable (party size grew past what's left, or time marched past it),
+  // it stops counting as "selected" the moment that becomes true — no
+  // separate effect needed to go clear selectedSlotTime back to null. This
+  // is also what the confirm button and summary line below key off of, not
+  // the raw click state.
+  const selectedSlot = slots?.find((s) => s.time === selectedSlotTime) ?? null;
+  const effectiveSlotTime = selectedSlot && bookabilityOf(selectedSlot).bookable ? selectedSlotTime : null;
+
+  // A returned list that doesn't start at the day's real opening time means
+  // generateSlots cut earlier slots (already past, or inside minLeadHours) —
+  // without this, "opens 10:00" above next to a grid starting at 13:00
+  // reads as a bug, not a lead-time rule.
+  const slotsWereFiltered =
+    !slotsLoading &&
+    !slotsError &&
+    !!slots &&
+    slots.length > 0 &&
+    !!openingHourForDay &&
+    slots[0].time !== openingHourForDay.openTime;
+
+  function slotDisplay(slot: Slot): { disabled: boolean; label: string; labelClass: string; timeClass: string } {
+    const bookability = bookabilityOf(slot);
+    if (bookability.bookable) {
+      return {
+        disabled: false,
+        label: MESSAGES.booking.slotSeatsRemaining(slot.available),
+        labelClass: "text-ink-soft",
+        timeClass: "text-ink",
+      };
     }
-
-    return { disabled, label, labelClass };
+    if (bookability.reason === "full") {
+      // Kept out of any opacity-affected element — a faded "เต็ม" is easy to
+      // misread as still-available. font-semibold plus full-strength text-bad,
+      // not muted like the other disabled reasons below.
+      return {
+        disabled: true,
+        label: MESSAGES.booking.slotFullBadge,
+        labelClass: "font-semibold text-bad",
+        timeClass: "text-ink-mute",
+      };
+    }
+    if (bookability.reason === "past") {
+      return {
+        disabled: true,
+        label: MESSAGES.booking.slotPastBadge,
+        labelClass: "text-ink-mute",
+        timeClass: "text-ink-mute",
+      };
+    }
+    // insufficient_party_size — short label ("ไม่พอ", not "เหลือ N ที่")
+    // deliberately, so it never wraps onto a second line and stretches
+    // that one card taller than the rest of the grid.
+    return {
+      disabled: true,
+      label: MESSAGES.booking.slotInsufficientForParty,
+      labelClass: "text-ink-mute",
+      timeClass: "text-ink-mute",
+    };
   }
 
   async function handleSubmit() {
-    if (!selectedSlotTime || submitting) return;
+    if (!effectiveSlotTime || submitting) return;
 
     setSubmitting(true);
     setSubmitError(null);
@@ -160,7 +210,7 @@ export function BookingBox({ restaurantId, restaurantStatus, openingHours, isLog
         body: JSON.stringify({
           restaurantId,
           date: selectedDateValue,
-          slotTime: selectedSlotTime,
+          slotTime: effectiveSlotTime,
           partySize,
           ...(note.trim() ? { customerNote: note.trim() } : {}),
         }),
@@ -193,17 +243,21 @@ export function BookingBox({ restaurantId, restaurantStatus, openingHours, isLog
           </p>
           <BookingStatusBadge status={successBooking.status} />
           <p className="text-sm text-ink-mute">{MESSAGES.booking.bookingSuccessCodeHint}</p>
-          <Button
-            variant="outline"
-            className="mt-2"
-            onClick={() => {
-              setSuccessBooking(null);
-              setSelectedSlotTime(null);
-              setNote("");
-            }}
-          >
-            {MESSAGES.booking.bookAnother}
-          </Button>
+          <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setSuccessBooking(null);
+                setSelectedSlotTime(null);
+                setNote("");
+              }}
+            >
+              {MESSAGES.booking.bookAnother}
+            </Button>
+            <Link href="/bookings/my" className={cn(buttonVariants({ variant: "outline" }))}>
+              {MESSAGES.booking.viewMyBookings}
+            </Link>
+          </div>
         </CardContent>
       </Card>
     );
@@ -241,7 +295,7 @@ export function BookingBox({ restaurantId, restaurantStatus, openingHours, isLog
                   )}
                 >
                   <span className="text-xs">
-                    {daysAhead === 0 ? "วันนี้" : DAY_OF_WEEK_SHORT_TH[calendarDayOfWeek(date)]}
+                    {daysAhead === 0 ? MESSAGES.common.today : DAY_OF_WEEK_SHORT_TH[calendarDayOfWeek(date)]}
                   </span>
                   <span className="font-medium">{date.getUTCDate()}</span>
                 </button>
@@ -264,7 +318,7 @@ export function BookingBox({ restaurantId, restaurantStatus, openingHours, isLog
                   variant="outline"
                   size="icon-sm"
                   disabled={partySize <= 1}
-                  aria-label="ลดจำนวนคน"
+                  aria-label={MESSAGES.booking.decreasePartySize}
                   onClick={() => setPartySize((n) => Math.max(1, n - 1))}
                 >
                   <Minus />
@@ -274,7 +328,7 @@ export function BookingBox({ restaurantId, restaurantStatus, openingHours, isLog
                   type="button"
                   variant="outline"
                   size="icon-sm"
-                  aria-label="เพิ่มจำนวนคน"
+                  aria-label={MESSAGES.booking.increasePartySize}
                   onClick={() => setPartySize((n) => n + 1)}
                 >
                   <Plus />
@@ -283,6 +337,13 @@ export function BookingBox({ restaurantId, restaurantStatus, openingHours, isLog
             </div>
 
             <div className="flex flex-col gap-2">
+              <div className="flex flex-col gap-0.5">
+                <p className="text-sm font-medium text-ink">{MESSAGES.booking.selectSlotLabel}</p>
+                {slotsWereFiltered && (
+                  <p className="text-xs text-ink-mute">{MESSAGES.booking.slotsFilteredNotice}</p>
+                )}
+              </div>
+
               {slotsLoading ? (
                 <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
                   {Array.from({ length: 8 }, (_, i) => (
@@ -293,7 +354,7 @@ export function BookingBox({ restaurantId, restaurantStatus, openingHours, isLog
                 <div className="flex flex-col items-center gap-2 rounded-lg bg-surface px-4 py-6 text-center">
                   <p className="text-sm text-bad">{errorText(slotsError)}</p>
                   <Button variant="outline" size="sm" onClick={() => fetchSlots(selectedDateValue)}>
-                    ลองใหม่
+                    {MESSAGES.common.retry}
                   </Button>
                 </div>
               ) : !slots || slots.length === 0 ? (
@@ -303,8 +364,8 @@ export function BookingBox({ restaurantId, restaurantStatus, openingHours, isLog
               ) : (
                 <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
                   {slots.map((slot) => {
-                    const { disabled, label, labelClass } = slotState(slot);
-                    const isSelected = selectedSlotTime === slot.time;
+                    const { disabled, label, labelClass, timeClass } = slotDisplay(slot);
+                    const isSelected = effectiveSlotTime === slot.time;
                     return (
                       <button
                         key={slot.time}
@@ -312,16 +373,18 @@ export function BookingBox({ restaurantId, restaurantStatus, openingHours, isLog
                         disabled={disabled}
                         onClick={() => setSelectedSlotTime(slot.time)}
                         className={cn(
-                          "flex flex-col items-center justify-center gap-0.5 rounded-lg border-2 px-2 py-2.5 text-sm transition-colors",
+                          "flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-lg border-2 px-2 py-2.5 text-sm transition-colors",
                           isSelected
-                            ? "border-gold bg-gold-dim text-ink"
+                            ? "border-gold bg-gold-dim"
                             : disabled
-                              ? "cursor-not-allowed border-transparent bg-canvas opacity-80"
-                              : "border-transparent bg-raised text-ink hover:border-gold-dim"
+                              ? "cursor-not-allowed border-transparent bg-canvas"
+                              : "border-transparent bg-raised hover:border-gold-dim"
                         )}
                       >
-                        <span className="font-medium">{slot.time}</span>
-                        <span className={cn("text-xs", labelClass)}>{label}</span>
+                        <span className={cn("font-medium", isSelected ? "text-ink" : timeClass)}>
+                          {slot.time}
+                        </span>
+                        <span className={cn("text-xs", isSelected ? "text-ink" : labelClass)}>{label}</span>
                       </button>
                     );
                   })}
@@ -350,11 +413,22 @@ export function BookingBox({ restaurantId, restaurantStatus, openingHours, isLog
               <p className="text-center text-sm text-bad">{errorText(submitError)}</p>
             )}
 
+            {effectiveSlotTime && (
+              <p className="text-center text-sm font-medium text-ink">
+                {MESSAGES.booking.bookingSummary(
+                  selectedDate.getUTCDate(),
+                  MONTH_SHORT_TH[selectedDate.getUTCMonth()],
+                  effectiveSlotTime,
+                  partySize
+                )}
+              </p>
+            )}
+
             {isLoggedIn ? (
               <Button
                 type="button"
                 size="lg"
-                disabled={!selectedSlotTime || submitting}
+                disabled={!effectiveSlotTime || submitting}
                 onClick={handleSubmit}
               >
                 {submitting ? (

@@ -24,6 +24,7 @@ export type UpdateRestaurantInput = z.infer<typeof updateRestaurantSchema>;
 // ?page=abc fails zod's base type coercion before any custom message here
 // would apply.
 export const listPublicRestaurantsSchema = z.object({
+  q: z.string().optional(),
   category: z.string().optional(),
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(50).default(20),

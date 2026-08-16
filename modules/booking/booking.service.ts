@@ -470,10 +470,28 @@ export type GetMyBookingsFilter = {
   pageSize?: number;
 };
 
+// The shape each Booking row comes back in from getMyBookings — enough for
+// /bookings/my and /dashboard to render a card (restaurant name) and to
+// decide client-side whether "cancel" should even be tappable (opening
+// hours + minLeadHours, same inputs changeBookingStatus itself uses for the
+// real deadline check server-side).
+const MY_BOOKINGS_INCLUDE = {
+  restaurant: {
+    select: {
+      id: true,
+      name: true,
+      openingHours: { select: { dayOfWeek: true, openTime: true, closeTime: true, isClosed: true } },
+      bookingSetting: { select: { minLeadHours: true } },
+    },
+  },
+} satisfies Prisma.BookingInclude;
+
+export type MyBooking = Prisma.BookingGetPayload<{ include: typeof MY_BOOKINGS_INCLUDE }>;
+
 export type MyBookings = {
-  upcoming: Booking[];
-  history: Booking[];
-  cancelled: Booking[];
+  upcoming: MyBooking[];
+  history: MyBooking[];
+  cancelled: MyBooking[];
 };
 
 /**
@@ -490,18 +508,21 @@ export async function getMyBookings(customerId: string, filter: GetMyBookingsFil
   const [upcoming, history, cancelled] = await Promise.all([
     prisma.booking.findMany({
       where: { customerId, status: { in: UPCOMING_BOOKING_STATUSES } },
+      include: MY_BOOKINGS_INCLUDE,
       orderBy: [{ bookingDate: "asc" }, { slotTime: "asc" }],
       skip,
       take: pageSize,
     }),
     prisma.booking.findMany({
       where: { customerId, status: { in: HISTORY_BOOKING_STATUSES } },
+      include: MY_BOOKINGS_INCLUDE,
       orderBy: [{ bookingDate: "desc" }, { slotTime: "desc" }],
       skip,
       take: pageSize,
     }),
     prisma.booking.findMany({
       where: { customerId, status: { in: CANCELLED_BOOKING_STATUSES } },
+      include: MY_BOOKINGS_INCLUDE,
       orderBy: [{ bookingDate: "desc" }, { slotTime: "desc" }],
       skip,
       take: pageSize,

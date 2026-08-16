@@ -70,6 +70,78 @@ export function computeSlotInstant(date: Date, openingHour: OpeningWindow, slotT
   return bangkokWallTimeToInstant(date, resolveSlotStartMinutes(openingHour, slotTime));
 }
 
+type OpeningHourWithClosed = OpeningWindow & { isClosed: boolean };
+
+/**
+ * Whether a restaurant is open right now, for an "open / closed now" badge
+ * on a restaurant list card. Needs *two* rows, not one: a business day that
+ * crosses midnight (rule 7) is keyed by the day it *started* on, so being
+ * open at, say, 01:00 on a Tuesday can mean either "Tuesday's own hours
+ * already started" or "Monday's overnight hours haven't ended yet" —
+ * checking only todayRow misses the second case entirely. Same
+ * resolveOpeningWindow the rest of this file uses, so this can never
+ * disagree with generateSlots about what "crosses midnight" means.
+ */
+export function isOpenNow(
+  todayRow: OpeningHourWithClosed,
+  yesterdayRow: OpeningHourWithClosed,
+  now: Date
+): boolean {
+  const nowMinutes = toBangkokParts(now).minutesSinceMidnight;
+
+  if (!yesterdayRow.isClosed) {
+    const { closeMinutes, crossesMidnight } = resolveOpeningWindow(yesterdayRow);
+    // closeMinutes was pushed past 1439 by resolveOpeningWindow when
+    // crossing — subtracting a day back off it recovers how far into
+    // *today* yesterday's overnight window still reaches.
+    if (crossesMidnight && nowMinutes < closeMinutes - 24 * 60) {
+      return true;
+    }
+  }
+
+  if (!todayRow.isClosed) {
+    const { openMinutes, closeMinutes, crossesMidnight } = resolveOpeningWindow(todayRow);
+    if (nowMinutes >= openMinutes && (crossesMidnight || nowMinutes < closeMinutes)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+export type SlotBookability =
+  | { bookable: true }
+  | { bookable: false; reason: "past" | "full" | "insufficient_party_size" };
+
+/**
+ * Whether a slot the API already returned can actually be selected for a
+ * given party size, right now. `generateSlots` above never returns a
+ * genuinely past or lead-time-blocked slot in the first place, but a slot
+ * list fetched a while ago can still go stale in the browser while the tab
+ * stays open (real time marches past `slotInstant`) or while the visitor
+ * changes party size after already picking a slot — both need re-checking
+ * against the *current* moment and the *current* party size, not just
+ * `available > 0`. Single source of truth for that decision so the UI
+ * (app/restaurants/[id]/booking-box.tsx) never re-derives it ad hoc.
+ */
+export function resolveSlotBookability(
+  slot: Slot,
+  partySize: number,
+  slotInstant: Date,
+  now: Date
+): SlotBookability {
+  if (slotInstant.getTime() <= now.getTime()) {
+    return { bookable: false, reason: "past" };
+  }
+  if (slot.available <= 0) {
+    return { bookable: false, reason: "full" };
+  }
+  if (slot.available < partySize) {
+    return { bookable: false, reason: "insufficient_party_size" };
+  }
+  return { bookable: true };
+}
+
 export function generateSlots(input: GenerateSlotsInput): Slot[] {
   const { openingHour, settings, date, now, isClosureDay, bookedMap } = input;
 

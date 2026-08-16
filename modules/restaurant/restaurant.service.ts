@@ -135,19 +135,40 @@ export async function listPublicRestaurants(filter: ListPublicRestaurantsInput) 
   const where: Prisma.RestaurantWhereInput = {
     status: RestaurantStatus.APPROVED,
     ...(filter.category ? { category: filter.category } : {}),
+    ...(filter.q?.trim() ? { name: { contains: filter.q.trim(), mode: "insensitive" } } : {}),
   };
 
-  const [items, total] = await Promise.all([
+  // openingHours included per restaurant so the card grid can show "open /
+  // closed now" (isOpenNow in slot.engine.ts) without a round trip per
+  // card — same reasoning as getRestaurantById including them for the
+  // detail page's accordion.
+  const [items, total, categoryRows] = await Promise.all([
     prisma.restaurant.findMany({
       where,
+      include: { openingHours: { orderBy: { dayOfWeek: "asc" } } },
       orderBy: { createdAt: "desc" },
       skip: (filter.page - 1) * filter.pageSize,
       take: filter.pageSize,
     }),
     prisma.restaurant.count({ where }),
+    // Always over *all* approved restaurants, not just this page/filter —
+    // the category filter's own option list shouldn't shrink to only what
+    // the current filter already matches.
+    prisma.restaurant.findMany({
+      where: { status: RestaurantStatus.APPROVED },
+      select: { category: true },
+      distinct: ["category"],
+      orderBy: { category: "asc" },
+    }),
   ]);
 
-  return { items, total, page: filter.page, pageSize: filter.pageSize };
+  return {
+    items,
+    total,
+    page: filter.page,
+    pageSize: filter.pageSize,
+    categories: categoryRows.map((row) => row.category),
+  };
 }
 
 export type RestaurantWithOpeningHours = Restaurant & {

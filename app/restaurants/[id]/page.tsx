@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ChevronDown } from "lucide-react";
 import { getProfileOrNull } from "@/lib/dal";
 import * as restaurantService from "@/modules/restaurant/restaurant.service";
 import { bangkokToday, calendarDayOfWeek } from "@/lib/datetime";
@@ -28,6 +29,7 @@ export default async function RestaurantDetailPage({
   }
 
   const todayDayOfWeek = calendarDayOfWeek(bangkokToday());
+  const todayHours = restaurant.openingHours.find((h) => h.dayOfWeek === todayDayOfWeek);
 
   return (
     <div className="flex-1 bg-canvas">
@@ -69,11 +71,22 @@ export default async function RestaurantDetailPage({
           )}
         </div>
 
-        <div>
-          <h2 className="mb-2 font-heading text-base font-semibold text-ink">
-            {MESSAGES.restaurant.openingHoursTitle}
-          </h2>
-          <dl className="overflow-hidden rounded-xl ring-1 ring-gold-dim">
+        {/* Native <details>/<summary> — collapsed by default, no JS needed.
+            The full 7-day table used to always render open, forcing mobile
+            visitors to scroll past it to reach the booking box below; now
+            only the one-line "today" summary shows until tapped. */}
+        <details className="group overflow-hidden rounded-xl ring-1 ring-gold-dim">
+          <summary className="flex cursor-pointer list-none items-center justify-between bg-raised px-4 py-3 text-sm font-medium text-ink [&::-webkit-details-marker]:hidden">
+            <span>
+              {todayHours?.isClosed
+                ? MESSAGES.restaurant.todayClosed
+                : todayHours
+                  ? MESSAGES.restaurant.todayOpenHours(todayHours.openTime, todayHours.closeTime)
+                  : MESSAGES.restaurant.openingHoursTitle}
+            </span>
+            <ChevronDown className="size-4 shrink-0 text-ink-mute transition-transform group-open:rotate-180" />
+          </summary>
+          <dl className="border-t border-gold-dim">
             {restaurant.openingHours.map((hour) => (
               <div
                 key={hour.dayOfWeek}
@@ -90,7 +103,7 @@ export default async function RestaurantDetailPage({
               </div>
             ))}
           </dl>
-        </div>
+        </details>
 
         <BookingBox
           restaurantId={restaurant.id}

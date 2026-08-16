@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { generateSlots, resolveSlotStartMinutes, computeSlotInstant } from "./slot.engine";
+import {
+  generateSlots,
+  resolveSlotStartMinutes,
+  computeSlotInstant,
+  resolveSlotBookability,
+  isOpenNow,
+} from "./slot.engine";
 import { bangkokWallTimeToInstant } from "@/lib/datetime";
 
 // `month` is 1-indexed here for readability, unlike the native Date API.
@@ -362,5 +368,116 @@ describe("resolveSlotStartMinutes / computeSlotInstant: recovering a stored slot
       // back from the wrapped display string alone.
       expect(direct.getTime()).toBe(computeSlotInstant(date, crossingOpeningHour, slot.time).getTime());
     }
+  });
+});
+
+describe("resolveSlotBookability: re-checking a fetched slot against the current moment and party size", () => {
+  const now = bkk(2026, 8, 20, 12, 0);
+  const futureInstant = bkk(2026, 8, 20, 19, 0);
+  const pastInstant = bkk(2026, 8, 20, 10, 0);
+
+  it("bookable when the slot has enough seats and hasn't started yet", () => {
+    const slot = { time: "19:00", capacity: 10, booked: 8, available: 2 };
+    expect(resolveSlotBookability(slot, 2, futureInstant, now)).toEqual({ bookable: true });
+  });
+
+  it("unbookable (full) when available is exactly 0, regardless of party size", () => {
+    const slot = { time: "19:00", capacity: 10, booked: 10, available: 0 };
+    expect(resolveSlotBookability(slot, 1, futureInstant, now)).toEqual({
+      bookable: false,
+      reason: "full",
+    });
+  });
+
+  // This is the exact scenario reported as a bug: a slot with 2 seats left
+  // (not full — available > 0) selected for a party of 10. available===0
+  // alone is not enough to catch this; the party size must be checked too.
+  it("unbookable (insufficient_party_size) when available > 0 but less than the requested party size", () => {
+    const slot = { time: "19:00", capacity: 10, booked: 8, available: 2 };
+    expect(resolveSlotBookability(slot, 10, futureInstant, now)).toEqual({
+      bookable: false,
+      reason: "insufficient_party_size",
+    });
+  });
+
+  it("unbookable (past) once the slot's real instant is no longer in the future, even with seats free", () => {
+    const slot = { time: "10:00", capacity: 10, booked: 0, available: 10 };
+    expect(resolveSlotBookability(slot, 2, pastInstant, now)).toEqual({
+      bookable: false,
+      reason: "past",
+    });
+  });
+
+  it("past takes priority over full when both apply", () => {
+    const slot = { time: "10:00", capacity: 10, booked: 10, available: 0 };
+    expect(resolveSlotBookability(slot, 2, pastInstant, now)).toEqual({
+      bookable: false,
+      reason: "past",
+    });
+  });
+
+  it("boundary: available exactly equal to party size is bookable (not 'insufficient')", () => {
+    const slot = { time: "19:00", capacity: 10, booked: 8, available: 2 };
+    expect(resolveSlotBookability(slot, 2, futureInstant, now)).toEqual({ bookable: true });
+  });
+});
+
+describe("isOpenNow: open/closed-now badge for a restaurant list card", () => {
+  const openRow = (openTime: string, closeTime: string) => ({ openTime, closeTime, isClosed: false });
+  const closedRow = { openTime: "00:00", closeTime: "00:00", isClosed: true };
+
+  it("open during today's own (non-crossing) hours", () => {
+    const today = openRow("10:00", "22:00");
+    const yesterday = closedRow;
+    expect(isOpenNow(today, yesterday, bkk(2026, 8, 20, 15, 0))).toBe(true);
+  });
+
+  it("closed before today's opening time and after today's closing time", () => {
+    const today = openRow("10:00", "22:00");
+    const yesterday = closedRow;
+    expect(isOpenNow(today, yesterday, bkk(2026, 8, 20, 9, 0))).toBe(false);
+    expect(isOpenNow(today, yesterday, bkk(2026, 8, 20, 22, 30))).toBe(false);
+  });
+
+  it("open right at the opening minute, closed right at the closing minute (half-open interval)", () => {
+    const today = openRow("10:00", "22:00");
+    const yesterday = closedRow;
+    expect(isOpenNow(today, yesterday, bkk(2026, 8, 20, 10, 0))).toBe(true);
+    expect(isOpenNow(today, yesterday, bkk(2026, 8, 20, 22, 0))).toBe(false);
+  });
+
+  it("closed when today's row is isClosed, even inside what would be its hours", () => {
+    const today = { openTime: "10:00", closeTime: "22:00", isClosed: true };
+    const yesterday = closedRow;
+    expect(isOpenNow(today, yesterday, bkk(2026, 8, 20, 15, 0))).toBe(false);
+  });
+
+  // The exact scenario the badge exists for: restaurant 2 in scripts/seed-demo.ts,
+  // open 18:00-02:00. At 01:00 the *next* calendar day, todayRow's own hours
+  // haven't started yet (opens 18:00) — only yesterday's overnight window
+  // still covers it.
+  it("open via yesterday's overnight window crossing into today, before today's own hours start", () => {
+    const today = openRow("18:00", "02:00");
+    const yesterday = openRow("18:00", "02:00");
+    expect(isOpenNow(today, yesterday, bkk(2026, 8, 20, 1, 0))).toBe(true);
+  });
+
+  it("closed in the gap after yesterday's overnight window ends and before today's own hours start", () => {
+    const today = openRow("18:00", "02:00");
+    const yesterday = openRow("18:00", "02:00");
+    // Gap is 02:00-18:00.
+    expect(isOpenNow(today, yesterday, bkk(2026, 8, 20, 10, 0))).toBe(false);
+  });
+
+  it("open via today's own crossing window in the evening portion", () => {
+    const today = openRow("18:00", "02:00");
+    const yesterday = openRow("18:00", "02:00");
+    expect(isOpenNow(today, yesterday, bkk(2026, 8, 20, 20, 0))).toBe(true);
+  });
+
+  it("not open via yesterday's window when yesterday was closed, even if today's own hours haven't started", () => {
+    const today = openRow("18:00", "02:00");
+    const yesterday = closedRow;
+    expect(isOpenNow(today, yesterday, bkk(2026, 8, 20, 1, 0))).toBe(false);
   });
 });

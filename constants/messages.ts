@@ -7,6 +7,21 @@ export const MESSAGES = {
     // ERROR_MESSAGES_TH instead.
     errorGeneric: "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง",
     loginRequired: "เข้าสู่ระบบเพื่อจอง",
+    retry: "ลองใหม่",
+    today: "วันนี้",
+  },
+
+  nav: {
+    searchRestaurants: "ค้นหาร้าน",
+    myBookings: "การจองของฉัน",
+    myRestaurants: "ร้านของฉัน",
+    adminPanel: "จัดการระบบ",
+    dashboard: "แดชบอร์ด",
+    login: "เข้าสู่ระบบ",
+    signup: "สมัครสมาชิก",
+    logout: "ออกจากระบบ",
+    openMenu: "เปิดเมนู",
+    menuTitle: "เมนู",
   },
 
   auth: {
@@ -55,6 +70,20 @@ export const MESSAGES = {
     openingHoursTitle: "เวลาเปิด-ปิด",
     closedLabel: "ปิด",
     backToList: "กลับไปหน้าค้นหาร้าน",
+    todayOpenHours: (openTime: string, closeTime: string) => `วันนี้ ${openTime} - ${closeTime}`,
+    todayClosed: "วันนี้ปิด",
+
+    // UI-facing (search/list page) — not returned by any service.
+    searchPlaceholder: "ค้นหาชื่อร้าน...",
+    categoryFilterLabel: "หมวดหมู่",
+    categoryAllLabel: "ทุกหมวด",
+    listEmptyTitle: "ไม่พบร้านที่ค้นหา",
+    listEmptyHint: "ลองลดตัวกรองหรือค้นหาด้วยคำอื่น",
+    openNowLabel: "เปิดอยู่",
+    closedNowLabel: "ปิดแล้ว",
+    prevPage: "ก่อนหน้า",
+    nextPage: "ถัดไป",
+    pageOf: (page: number, totalPages: number) => `หน้า ${page} จาก ${totalPages}`,
   },
 
   booking: {
@@ -86,13 +115,20 @@ export const MESSAGES = {
     // UI-facing (booking box + booking list) — not returned by any service.
     selectDateLabel: "เลือกวันที่",
     partySizeLabel: "จำนวนคน",
+    decreasePartySize: "ลดจำนวนคน",
+    increasePartySize: "เพิ่มจำนวนคน",
+    selectSlotLabel: "รอบเวลา",
     slotsLoading: "กำลังโหลดรอบเวลา...",
     slotsEmptyClosed: "ร้านปิดในวันที่เลือก",
     slotsEmptyGeneric: "ไม่มีรอบว่างสำหรับวันที่เลือก กรุณาเลือกวันอื่น",
+    slotsFilteredNotice: "แสดงเฉพาะรอบที่ยังจองได้",
     slotFullBadge: "เต็ม",
     slotPastBadge: "ผ่านไปแล้ว",
     slotSeatsRemaining: (n: number) => `เหลือ ${n} ที่`,
+    slotInsufficientForParty: "ไม่พอ",
     pendingConfirmationNotice: "จองแล้วต้องรอร้านยืนยัน",
+    bookingSummary: (day: number, monthShort: string, time: string, partySize: number) =>
+      `${day} ${monthShort} · ${time} · ${partySize} คน`,
     confirmButton: "ยืนยันการจอง",
     confirmButtonPending: "กำลังจอง...",
     customerNoteLabel: "หมายเหตุถึงร้าน (ถ้ามี)",
@@ -100,7 +136,32 @@ export const MESSAGES = {
     bookingSuccessTitle: "จองสำเร็จ",
     bookingSuccessCodeHint: "แสดงรหัสนี้ให้ร้านดูเมื่อไปถึง",
     bookAnother: "จองรอบอื่นเพิ่ม",
+    viewMyBookings: "ดูการจองของฉัน",
     codeLabel: "รหัสการจอง",
+
+    // UI-facing (/bookings/my, /dashboard) — not returned by any service.
+    tabUpcoming: "กำลังจะถึง",
+    tabHistory: "ประวัติ",
+    tabCancelled: "ยกเลิกแล้ว",
+    emptyUpcoming: "ยังไม่มีการจองที่กำลังจะถึง",
+    emptyHistory: "ยังไม่มีประวัติการจอง",
+    emptyCancelled: "ยังไม่มีการจองที่ยกเลิก",
+    emptyBookingsHint: "เริ่มค้นหาร้านที่ใช่แล้วจองได้เลย",
+    partySizeCount: (n: number) => `${n} ที่นั่ง`,
+    cancelButton: "ยกเลิกการจอง",
+    cancelDialogTitle: "ยืนยันยกเลิกการจอง?",
+    cancelDialogDescription: (restaurantName: string, day: number, monthShort: string, time: string) =>
+      `การจองที่ ${restaurantName} วันที่ ${day} ${monthShort} เวลา ${time} จะถูกยกเลิก การกระทำนี้ย้อนกลับไม่ได้`,
+    cancelDialogConfirm: "ยืนยันยกเลิก",
+    cancelDialogDismiss: "ไม่ยกเลิก",
+    cancelPending: "กำลังยกเลิก...",
+    upcomingBookingsTitle: "การจองที่กำลังจะถึง",
+    viewAllBookings: "ดูทั้งหมด",
+  },
+
+  dashboard: {
+    greeting: (email: string) => `สวัสดี, ${email}`,
+    manageMyRestaurants: "จัดการร้านของฉัน",
   },
 
   admin: {
@@ -114,6 +175,12 @@ export const MESSAGES = {
         : `สถานะปัจจุบันคือ "${current}" ไม่สามารถเปลี่ยนสถานะได้อีก`,
   },
 } as const;
+
+export const ROLE_LABELS_TH: Record<string, string> = {
+  customer: "ลูกค้า",
+  owner: "เจ้าของร้าน",
+  admin: "แอดมิน",
+};
 
 export const RESTAURANT_STATUS_LABELS_TH: Record<string, string> = {
   PENDING: "รอตรวจสอบ",
@@ -135,6 +202,22 @@ export const DAY_OF_WEEK_LABELS_TH: string[] = [
 ];
 
 export const DAY_OF_WEEK_SHORT_TH: string[] = ["อา", "จ", "อ", "พ", "พฤ", "ศ", "ส"];
+
+// Index 0 = January ... 11 = December, matching Date.getUTCMonth().
+export const MONTH_SHORT_TH: string[] = [
+  "ม.ค.",
+  "ก.พ.",
+  "มี.ค.",
+  "เม.ย.",
+  "พ.ค.",
+  "มิ.ย.",
+  "ก.ค.",
+  "ส.ค.",
+  "ก.ย.",
+  "ต.ค.",
+  "พ.ย.",
+  "ธ.ค.",
+];
 
 export const BOOKING_STATUS_LABELS_TH: Record<string, string> = {
   PENDING: "รอร้านยืนยัน",
