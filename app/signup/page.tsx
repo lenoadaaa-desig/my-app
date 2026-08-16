@@ -3,97 +3,76 @@
 import Link from "next/link";
 import { useActionState } from "react";
 import { signup } from "./actions";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 
 export default function SignupPage() {
   const [state, action, pending] = useActionState(signup, undefined);
 
   return (
-    <div className="flex flex-1 items-center justify-center bg-zinc-50 px-4 dark:bg-black">
-      <form
-        action={action}
-        className="flex w-full max-w-sm flex-col gap-4 rounded-lg border border-black/[.08] bg-white p-8 dark:border-white/[.145] dark:bg-zinc-950"
-      >
-        <h1 className="text-xl font-semibold text-black dark:text-zinc-50">
-          Sign up
-        </h1>
+    <div className="flex flex-1 items-center justify-center bg-canvas px-4 py-12">
+      <Card className="w-full max-w-sm">
+        <CardHeader>
+          <CardTitle className="text-xl">สมัครสมาชิก</CardTitle>
+          <CardDescription>สร้างบัญชีเพื่อเริ่มจองโต๊ะร้านอาหาร</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form action={action} className="flex flex-col gap-4">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="name">ชื่อ-นามสกุล</Label>
+              <Input id="name" name="name" type="text" required autoComplete="name" />
+            </div>
 
-        <div className="flex flex-col gap-1">
-          <label htmlFor="name" className="text-sm text-zinc-600 dark:text-zinc-400">
-            ชื่อ-นามสกุล
-          </label>
-          <input
-            id="name"
-            name="name"
-            type="text"
-            required
-            className="rounded border border-black/[.08] bg-transparent px-3 py-2 text-sm dark:border-white/[.145]"
-          />
-        </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="phone">เบอร์โทรศัพท์</Label>
+              <Input id="phone" name="phone" type="tel" required autoComplete="tel" />
+            </div>
 
-        <div className="flex flex-col gap-1">
-          <label htmlFor="phone" className="text-sm text-zinc-600 dark:text-zinc-400">
-            เบอร์โทรศัพท์
-          </label>
-          <input
-            id="phone"
-            name="phone"
-            type="tel"
-            required
-            className="rounded border border-black/[.08] bg-transparent px-3 py-2 text-sm dark:border-white/[.145]"
-          />
-        </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="email">อีเมล</Label>
+              <Input id="email" name="email" type="email" required autoComplete="email" />
+            </div>
 
-        <div className="flex flex-col gap-1">
-          <label htmlFor="email" className="text-sm text-zinc-600 dark:text-zinc-400">
-            Email
-          </label>
-          <input
-            id="email"
-            name="email"
-            type="email"
-            required
-            className="rounded border border-black/[.08] bg-transparent px-3 py-2 text-sm dark:border-white/[.145]"
-          />
-        </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="password">รหัสผ่าน</Label>
+              <Input
+                id="password"
+                name="password"
+                type="password"
+                required
+                minLength={8}
+                autoComplete="new-password"
+              />
+            </div>
 
-        <div className="flex flex-col gap-1">
-          <label htmlFor="password" className="text-sm text-zinc-600 dark:text-zinc-400">
-            Password
-          </label>
-          <input
-            id="password"
-            name="password"
-            type="password"
-            required
-            minLength={8}
-            className="rounded border border-black/[.08] bg-transparent px-3 py-2 text-sm dark:border-white/[.145]"
-          />
-        </div>
+            {state && "error" in state && (
+              <p className="text-sm text-bad">{state.error}</p>
+            )}
+            {state && "message" in state && (
+              <p className="text-sm text-ok">{state.message}</p>
+            )}
 
-        {state && "error" in state && (
-          <p className="text-sm text-red-600 dark:text-red-400">{state.error}</p>
-        )}
-        {state && "message" in state && (
-          <p className="text-sm text-emerald-600 dark:text-emerald-400">
-            {state.message}
-          </p>
-        )}
+            <Button type="submit" disabled={pending} className="mt-2 w-full">
+              {pending ? "กำลังสมัครสมาชิก..." : "สมัครสมาชิก"}
+            </Button>
 
-        <button
-          type="submit"
-          disabled={pending}
-          className="mt-2 h-10 rounded-full bg-foreground text-sm font-medium text-background transition-colors hover:bg-[#383838] disabled:opacity-50 dark:hover:bg-[#ccc]"
-        >
-          {pending ? "Signing up..." : "Sign up"}
-        </button>
-
-        <p className="text-sm text-zinc-600 dark:text-zinc-400">
-          Already have an account?{" "}
-          <Link href="/login" className="font-medium text-black dark:text-zinc-50">
-            Log in
-          </Link>
-        </p>
-      </form>
+            <p className="text-sm text-ink-soft">
+              มีบัญชีอยู่แล้ว?{" "}
+              <Link href="/login" className="font-medium text-gold hover:underline">
+                เข้าสู่ระบบ
+              </Link>
+            </p>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   );
 }

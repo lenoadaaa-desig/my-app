@@ -2,6 +2,13 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
+/*
+ * Dark mode is intentionally disabled, not unfinished — the cream/gold theme
+ * is designed for a light surface only. `dark:` stays scoped to an explicit
+ * `.dark` class (never a `prefers-color-scheme` media query) and nothing in
+ * the app ever adds that class, so `dark:*` utilities are permanently inert
+ * regardless of the visitor's OS setting. See CLAUDE.md's theme note.
+ */
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
@@ -46,75 +53,81 @@
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+
+  /* TableNow semantic palette — see CLAUDE.md for the design decision.
+     Every component must reference these (bg-canvas, text-ink-soft,
+     border-gold-dim, text-ok, ...) instead of a hardcoded hex value. */
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-raised: var(--raised);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-ink-mute: var(--ink-mute);
+  --color-gold: var(--gold);
+  --color-gold-dim: var(--gold-dim);
+  --color-sun: var(--sun);
+  --color-sky: var(--sky);
+  --color-tangerine: var(--tangerine);
+  --color-ok: var(--ok);
+  --color-warn: var(--warn);
+  --color-bad: var(--bad);
 }
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  /* พื้นผิว (surfaces) */
+  --canvas: #f1efe8;
+  --surface: #faeeda;
+  --raised: #ffffff;
+
+  /* ตัวอักษร (text) — ไม่ใช้สีดำสนิทเลยทั้งเว็บ */
+  --ink: #2c2c2a;
+  --ink-soft: #5f5e5a;
+  --ink-mute: #888780;
+
+  /* แบรนด์ (brand) */
+  --gold: #ba7517;
+  --gold-dim: #fac775;
+  --sun: #f5de50;
+  --sky: #a8beda;
+  --tangerine: #f9a45c;
+
+  /* สถานะ (status) — คงความหมายเดิมเสมอ ห้ามเปลี่ยนเป็นโทนทอง */
+  --ok: #0f6e56;
+  --warn: #854f0b;
+  --bad: #a32d2d;
+
+  --background: var(--canvas);
+  --foreground: var(--ink);
+  --card: var(--surface);
+  --card-foreground: var(--ink);
+  --popover: var(--raised);
+  --popover-foreground: var(--ink);
+  --primary: var(--gold);
+  --primary-foreground: var(--raised);
+  --secondary: var(--gold-dim);
+  --secondary-foreground: var(--ink);
+  --muted: var(--surface);
+  --muted-foreground: var(--ink-soft);
+  --accent: var(--sky);
+  --accent-foreground: var(--ink);
+  --destructive: var(--bad);
+  --border: var(--gold-dim);
+  --input: var(--gold-dim);
+  --ring: var(--gold);
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
   --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
-}
-
-.dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --sidebar: var(--surface);
+  --sidebar-foreground: var(--ink);
+  --sidebar-primary: var(--gold);
+  --sidebar-primary-foreground: var(--raised);
+  --sidebar-accent: var(--sky);
+  --sidebar-accent-foreground: var(--ink);
+  --sidebar-border: var(--gold-dim);
+  --sidebar-ring: var(--gold);
 }
 
 @layer base {

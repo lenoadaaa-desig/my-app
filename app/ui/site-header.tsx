@@ -1,38 +1,37 @@
 import Link from "next/link";
 import { getUser } from "@/lib/dal";
 import { logout } from "@/app/actions";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 export async function SiteHeader() {
   const user = await getUser();
 
   return (
-    <header className="flex items-center justify-between border-b border-black/[.08] px-6 py-4 text-sm dark:border-white/[.145]">
-      <Link href="/" className="font-semibold text-black dark:text-zinc-50">
-        my-app
+    <header className="flex items-center justify-between border-b border-gold-dim bg-surface px-6 py-4 text-sm">
+      <Link href="/" className="font-heading font-semibold text-ink">
+        TableNow
       </Link>
 
       <nav className="flex items-center gap-4">
         {user ? (
           <>
-            <Link href="/dashboard" className="text-zinc-600 dark:text-zinc-400">
-              Dashboard
+            <Link href="/dashboard" className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}>
+              แดชบอร์ด
             </Link>
             <form action={logout}>
-              <button
-                type="submit"
-                className="text-zinc-600 underline dark:text-zinc-400"
-              >
-                Log out
-              </button>
+              <Button variant="ghost" size="sm" type="submit">
+                ออกจากระบบ
+              </Button>
             </form>
           </>
         ) : (
           <>
-            <Link href="/login" className="text-zinc-600 dark:text-zinc-400">
-              Log in
+            <Link href="/login" className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}>
+              เข้าสู่ระบบ
             </Link>
-            <Link href="/signup" className="font-medium text-black dark:text-zinc-50">
-              Sign up
+            <Link href="/signup" className={cn(buttonVariants({ variant: "default", size: "sm" }))}>
+              สมัครสมาชิก
             </Link>
           </>
         )}

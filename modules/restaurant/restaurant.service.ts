@@ -150,8 +150,18 @@ export async function listPublicRestaurants(filter: ListPublicRestaurantsInput) 
   return { items, total, page: filter.page, pageSize: filter.pageSize };
 }
 
-export async function getRestaurantById(id: string, viewer: Profile | null): Promise<Restaurant | null> {
-  const restaurant = await prisma.restaurant.findUnique({ where: { id } });
+export type RestaurantWithOpeningHours = Restaurant & {
+  openingHours: { dayOfWeek: number; openTime: string; closeTime: string; isClosed: boolean }[];
+};
+
+export async function getRestaurantById(
+  id: string,
+  viewer: Profile | null
+): Promise<RestaurantWithOpeningHours | null> {
+  const restaurant = await prisma.restaurant.findUnique({
+    where: { id },
+    include: { openingHours: { orderBy: { dayOfWeek: "asc" } } },
+  });
   if (!restaurant) {
     return null;
   }

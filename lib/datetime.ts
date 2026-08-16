@@ -106,3 +106,17 @@ export function parseCalendarDateString(value: string): Date | null {
 export function calendarDayOfWeek(date: Date): number {
   return date.getUTCDay();
 }
+
+/**
+ * Today's calendar date in Asia/Bangkok, as a pure calendar date value (same
+ * UTC-midnight shape parseCalendarDateString returns) — not the visitor's
+ * local timezone. Both the restaurant detail page (server) and its booking
+ * widget (client) need "today" to build their date picker from the same
+ * definition of "today" the booking engine itself uses, so this lives here
+ * rather than being reimplemented on either side. `now` defaults to the
+ * real clock but can be overridden, same convention as slot.engine.ts.
+ */
+export function bangkokToday(now: Date = new Date()): Date {
+  const parts = toBangkokParts(now);
+  return new Date(Date.UTC(parts.year, parts.month, parts.day));
+}

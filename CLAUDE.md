@@ -126,6 +126,17 @@ Prisma CLI อ่าน `.env.local` ไม่ได้ ต้องเรีย
    เช็คแค่ login แล้วหรือยัง ไม่เช็ค role
    ความปลอดภัยจริงอยู่ที่ `requireRole` ใน `lib/dal.ts`
 
+   proxy.ts ต้องเช็ค request.method === 'GET' ก่อน redirect
+   เพราะ Server Action ยิง POST กลับไปที่ URL เดิม
+   ถ้า proxy ดัก POST แล้ว redirect ธรรมดา
+   client จะได้ response ที่ไม่มี header x-action-redirect
+   -> An unexpected response was received from the server
+   proxy เป็นแค่ UX guard ตอน navigate ไม่ใช่ตัวบังคับสิทธิ์
+   (บั๊กจริงที่เจอ: ผู้ใช้ที่ login ค้างอยู่แล้วกด submit ที่ `/signup`
+   — proxy เห็น `user` มีค่าแล้ว redirect POST ของ signup action
+   ทิ้งไปที่ `/dashboard` ทันที ก่อน action จะได้รันเลยด้วยซ้ำ
+   ดู `lib/supabase/proxy.ts`'s `isNavigation` guard)
+
 8. กันจองเกินที่นั่งด้วย `pg_advisory_xact_lock` (2-key) เท่านั้น
    ห้ามใช้ `pg_advisory_lock` (session-scoped)
    เหตุผล: `DATABASE_URL` วิ่งผ่าน Supabase PgBouncer แบบ transaction pooling
@@ -142,20 +153,60 @@ Prisma CLI อ่าน `.env.local` ไม่ได้ ต้องเรีย
    พอถือ advisory lock แล้ว ห้ามใส่ `FOR UPDATE` ซ้อนบน `bookings` อีก —
    lock ตัวเดียวคุม writer ทุกตัวของ slot นั้นอยู่แล้ว
 
+9. **ธีมสี = ครีมทอง พื้นสว่างเท่านั้น ปิด dark mode โดยตั้งใจ ไม่ใช่ลืมทำ**
+   โทเคนสีทั้งหมดกำหนดที่ `app/globals.css` (`@theme inline` + `:root`
+   — Tailwind v4, ไม่มี `tailwind.config.ts`) แล้ว remap ทับตัวแปรของ
+   shadcn เดิม (`--background`/`--primary`/`--border`/...) ไปที่โทเคนใหม่
+   เพื่อให้คอมโพเนนต์ shadcn ที่มีอยู่ (`Button`, `Input`, `Card`, `Badge`)
+   ได้ธีมใหม่ทันทีโดยไม่ต้องแก้โค้ดคอมโพเนนต์เอง:
+
+   พื้นผิว: `canvas` `surface` `raised`
+   ตัวอักษร: `ink` `ink-soft` `ink-mute` (ห้ามใช้สีดำสนิทกับตัวอักษร)
+   แบรนด์: `gold` `gold-dim` `sun` `sky` `tangerine`
+   สถานะ: `ok` `warn` `bad` (ความหมายตายตัว ห้ามเปลี่ยนเป็นโทนทอง)
+
+   ห้าม hardcode hex ในคอมโพเนนต์ — ใช้ class เช่น `bg-canvas`
+   `text-ink-soft` `border-gold-dim` `text-ok` เสมอ
+
+   `@custom-variant dark (&:is(.dark *));` ยังอยู่ใน `globals.css` โดยตั้งใจ
+   (ไม่ใช่ค้าง) — มันผูก `dark:` ไว้กับ class `.dark` เท่านั้น ไม่ใช่
+   `prefers-color-scheme` และไม่มีจุดไหนในแอปเติม `.dark` ให้ `<html>` เลย
+   ผลคือ `dark:*` utility (ที่ยังเหลืออยู่ในคอมโพเนนต์ shadcn เดิมอย่าง
+   `button.tsx`/`input.tsx`/`badge.tsx`) จะไม่มีวันทำงาน ไม่ว่า OS ผู้ใช้จะ
+   ตั้งเป็น dark theme หรือไม่ก็ตาม — บล็อก `.dark { ... }` ตัวแปรสีเดิม (เทา
+   ล้วน) ถูกลบออกจาก `globals.css` แล้วเพราะเป็น dead code ที่ไม่มีทาง
+   reachable ได้อีก ถ้าจะเปิด dark mode จริงในอนาคตต้องออกแบบชุดสีมืดใหม่
+   ทั้งชุดที่ยังคุมความหมายของสถานะ (ok/warn/bad) ไว้เหมือนเดิม ไม่ใช่แค่
+   เอาบล็อกเก่ากลับมา
+
+   `BOOKING_STATUS_LABELS_TH` (`constants/messages.ts`) ใช้ทั้งฝั่ง backend
+   (ข้อความ error) และต้องมีสีคู่กันฝั่ง UI — แยกเป็นคนละ map
+   (`BOOKING_STATUS_COLORS`) ไม่รวมเข้าด้วยกัน เพราะ `booking.service.ts`
+   import `BOOKING_STATUS_LABELS_TH` มาใช้เป็น string ตรง ๆ ใน
+   `invalidTransition(...)` อยู่แล้ว ถ้าเปลี่ยนรูปร่างเป็น object จะพังจุดนั้น
+
+10. **Confirm email**: signup flow ตัดสินจากผลลัพธ์ signUp ว่าได้ session ไหม
+    ไม่ใช่จาก config ทำให้ทำงานถูกทั้งตอน Confirm email
+    เปิดและปิด ไม่ต้องแก้โค้ดตอน deploy
+    (`authService.signUp` คืน `hasSession: data.session !== null` จากผลลัพธ์
+    `supabase.auth.signUp()` จริงของคำขอนั้น — ไม่ได้เดาจาก env/project setting
+    `app/signup/actions.ts` เช็คค่านี้: ได้ session -> `redirect("/dashboard")`
+    ทันที (นอก try/catch เสมอ เพราะ redirect ทำงานด้วยการ throw
+    `NEXT_REDIRECT`), ไม่ได้ session -> โชว์ข้อความให้ไปยืนยันอีเมล
+    ปัจจุบัน (2026-08-16) โปรเจกต์นี้ปิด Confirm email ไว้ที่ Supabase
+    Dashboard สมัครเสร็จจะได้ session ทันทีและ redirect ไป dashboard เลย)
+
 ## ปัญหาค้างที่ยังไม่แก้
 
 - Role type ใน `lib/dal.ts` ยังเป็น `"user" | "admin"` ไม่ตรง enum จริง (DB enum คือ `customer`/`owner`/`admin` แล้ว)
 - `admin-user-table.tsx` dropdown ยังเป็น user/admin
 - role check กระจายอยู่ 2 จุด (`app/admin/page.tsx`, `app/admin/actions.ts`)
-- `.env.local` ยังขาด `SUPABASE_SERVICE_ROLE_KEY` (`DATABASE_URL`/`DIRECT_URL` เติมแล้ว)
 - `supabase/rls-and-triggers.sql` เขียนเสร็จแล้วแต่ **ยังไม่ได้ apply ลง DB จริง** —
   จนกว่าจะ apply ทุกตารางจะเป็น RLS เปิดแบบไม่มี policy (deny-all แม้แต่ SELECT)
 - `Profile` ไม่มี FK ไป `auth.users` ต้องมีฟังก์ชันลบ user
   ที่ลบทั้ง `auth.users` และ `profiles` พร้อมกัน (ทำใน Task 2)
 - `updated_at` อัปเดตเฉพาะเมื่อแก้ผ่าน Prisma
   แก้ผ่าน SQL ตรง ๆ จะไม่ขยับ
-- ยังไม่มีโค้ดสร้าง `profiles` row ตอน signup (เดิมพึ่ง `handle_new_user` trigger
-  แต่ตัดสินใจแล้วว่าให้สร้างในโค้ดแทน — ยังไม่ได้ทำ, Task 2)
 
 ## Architecture
 
@@ -187,6 +238,20 @@ Auth needs `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY`; Prisma 
 shadcn/ui is configured via `components.json`: style `base-nova` on Base UI primitives (`@base-ui/react`, not Radix), icon library `lucide-react`, path aliases `@/components`, `@/components/ui`, `@/lib`, `@/hooks`. Installed primitives live in `components/ui/*` (add more with `npx shadcn@latest add <name>`). `components/icons/icon-placeholder.tsx` is a local component, not a registry item — shadcn's own block templates use `<IconPlaceholder lucide="IconName" />` as a build-time marker the CLI swaps for a real `lucide-react` import; this project implements that same contract at runtime so pasted block snippets work without manual editing.
 
 `@headlessui/react` and `@heroicons/react` are also installed, used by pages built from Tailwind Plus / Tailwind UI templates (which ship Headless UI + Heroicons, not Base UI/lucide) rather than from the shadcn registry. Both primitive/icon stacks coexist — match whichever a given page or pasted snippet already uses rather than converting it to the other.
+
+The cream/gold semantic color palette (`canvas`/`surface`/`raised`, `ink`/`ink-soft`/`ink-mute`, `gold`/`gold-dim`/`sun`/`sky`/`tangerine`, `ok`/`warn`/`bad`) lives entirely in `app/globals.css` — see "การตัดสินใจสถาปัตยกรรม" item 9. Never hardcode a hex value in a component; use the `bg-*`/`text-*`/`border-*` utilities Tailwind generates from those tokens.
+
+ห้าม render ลิงก์ผ่าน Button component ของ Base UI
+ถ้าต้องการลิงก์ที่หน้าตาเป็นปุ่ม ให้ใช้
+`<Link className={cn(buttonVariants({...}))}>` แทน
+(ตามเอกสาร `node_modules/@base-ui/react/docs/react/components/button.md`)
+— `nativeButton={false}` ใช้ได้เฉพาะ tag ที่ไม่ใช่ link (เช่น `<div>`)
+เอกสารบอกตรง ๆ ว่า `<a>`/`<Link>` มี semantics ของตัวเองอยู่แล้ว
+ห้ามส่งผ่าน `render` prop ของ `Button` เด็ดขาด ไม่ว่าจะตั้ง `nativeButton`
+เป็นอะไรก็ตาม (บั๊กจริงที่เจอ: `<Button render={<Link .../>}>` ทำให้ Base UI
+ขึ้น console error "expected a native \<button\> because nativeButton is
+true" — แก้แล้วทุกจุดในโปรเจกต์ ดู `components/ui/button.tsx`'s
+`buttonVariants` export เป็นตัวอย่าง)
 
 ## Target folder structure
 

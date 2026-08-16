@@ -41,11 +41,22 @@ export async function updateSession(request: NextRequest) {
   );
   const isAuthRoute = AUTH_PATHS.includes(pathname);
 
-  if (isProtectedRoute && !user) {
+  // Server Actions POST to the same pathname as the page that invoked them
+  // (e.g. the /signup form's action posts to /signup), distinguished from a
+  // real navigation only by method. A page-navigation redirect here would
+  // otherwise also intercept that POST and hand back a plain 3xx response —
+  // which is not a valid Server Action response (no `x-action-redirect`
+  // header, wrong content-type), so the browser's Server Actions runtime
+  // rejects it with "An unexpected response was received from the server"
+  // instead of ever running the action. Redirecting is only correct for an
+  // actual page load (GET).
+  const isNavigation = request.method === "GET";
+
+  if (isNavigation && isProtectedRoute && !user) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
-  if (isAuthRoute && user) {
+  if (isNavigation && isAuthRoute && user) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 

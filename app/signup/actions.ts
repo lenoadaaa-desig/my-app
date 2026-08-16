@@ -1,5 +1,6 @@
 "use server";
 
+import { redirect } from "next/navigation";
 import { signUpSchema } from "@/modules/auth/auth.schema";
 import * as authService from "@/modules/auth/auth.service";
 import { MESSAGES } from "@/constants/messages";
@@ -24,6 +25,15 @@ export async function signup(
   const result = await authService.signUp(parsed.data);
   if (!result.success) {
     return { error: result.error.message };
+  }
+
+  // hasSession reflects this call's actual Supabase result (Confirm email
+  // on -> null session; off -> a live one), not an assumption about the
+  // project's config — see CLAUDE.md. redirect() must stay outside any
+  // try/catch: it works by throwing NEXT_REDIRECT, which a catch here
+  // would swallow and turn into a real error.
+  if (result.data.hasSession) {
+    redirect("/dashboard");
   }
 
   return { message: MESSAGES.auth.signUpSuccess };

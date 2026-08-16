@@ -26,7 +26,17 @@ function toProfile(row: { id: string; email: string | null; role: PrismaRole }):
   return { id: row.id, email: row.email, role: fromPrismaRole(row.role) };
 }
 
-export async function signUp(input: SignUpInput): Promise<ServiceResult<Profile>> {
+export type SignUpResult = {
+  profile: Profile;
+  // Whether supabase.auth.signUp() handed back a live session, i.e.
+  // whether the Supabase project's "Confirm email" setting is currently on
+  // or off — read from this call's actual result, never assumed from
+  // config, so the caller works correctly either way without a code change
+  // when that project setting changes. See CLAUDE.md's signup-flow note.
+  hasSession: boolean;
+};
+
+export async function signUp(input: SignUpInput): Promise<ServiceResult<SignUpResult>> {
   const supabase = await createClient();
   const { data, error } = await supabase.auth.signUp({
     email: input.email,
@@ -41,6 +51,7 @@ export async function signUp(input: SignUpInput): Promise<ServiceResult<Profile>
     };
   }
 
+  const hasSession = data.session !== null;
   const userId = data.user.id;
   const adminClient = createAdminClient();
 
@@ -86,7 +97,7 @@ export async function signUp(input: SignUpInput): Promise<ServiceResult<Profile>
     };
   }
 
-  return { success: true, data: toProfile(profileRow) };
+  return { success: true, data: { profile: toProfile(profileRow), hasSession } };
 }
 
 // Defensive repair for auth users that ended up with no profile row (e.g. a
