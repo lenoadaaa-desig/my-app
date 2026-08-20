@@ -2,7 +2,7 @@
 
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2 } from "lucide-react";
+import { Loader2, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -158,7 +158,18 @@ export function RestaurantReviewActions({
           open, the dialog renders its own copy of this same error so the
           admin sees it next to the form that produced it. */}
       {error && !rejectOpen && <p className="text-sm text-bad">{errorText(error)}</p>}
-      {successAction && <p className="text-sm text-ok">{SUCCESS_MESSAGE[successAction]}</p>}
+      {/* text-ink-soft (not text-ok) — plain colored text next to real
+          buttons read as clickable to at least one admin during testing.
+          The CheckCircle2 icon (not the text color) now carries the
+          "this succeeded" signal, same idea as the status badges. Shared
+          by all three actions (approve/reject/suspend) via one render
+          path, so they can't drift into different styles from each other. */}
+      {successAction && (
+        <p className="flex items-center gap-1.5 text-sm text-ink-soft">
+          <CheckCircle2 className="size-4 shrink-0 text-ok" />
+          {SUCCESS_MESSAGE[successAction]}
+        </p>
+      )}
 
       <Dialog open={rejectOpen} onOpenChange={(open) => !pending && setRejectOpen(open)}>
         <DialogContent>
@@ -172,7 +183,17 @@ export function RestaurantReviewActions({
               <Label>{MESSAGES.admin.rejectReasonSelectLabel}</Label>
               <Select value={rejectReasonValue} onValueChange={(v) => v && setRejectReasonValue(v)}>
                 <SelectTrigger className="w-full">
-                  <SelectValue />
+                  {/* Base UI's Select.Value renders the raw `value` by
+                      default (unlike Radix, it does NOT auto-derive the
+                      matched Item's label) — see app/restaurants/page.tsx's
+                      SelectValue for the same note. Without this
+                      children-function, picking e.g. "รูปไม่ชัด" would show
+                      the literal option key "blurry_photo" once closed. */}
+                  <SelectValue>
+                    {(value: string) =>
+                      REJECT_REASON_OPTIONS.find((o) => o.value === value)?.label ?? value
+                    }
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {REJECT_REASON_OPTIONS.map((o) => (

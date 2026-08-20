@@ -452,6 +452,18 @@ The cream/gold semantic color palette (`canvas`/`surface`/`raised`, `ink`/`ink-s
 true" — แก้แล้วทุกจุดในโปรเจกต์ ดู `components/ui/button.tsx`'s
 `buttonVariants` export เป็นตัวอย่าง)
 
+Base UI's `Select.Value` แสดงค่า raw `value` ตรง ๆ ไม่ auto-derive label
+จาก `SelectItem` ที่ตรงกันให้เหมือน Radix — ทุกครั้งที่ใช้ `Select` ต้องส่ง
+function เป็น children ของ `SelectValue` เพื่อ map ค่า -> label ภาษาไทยเอง
+(`{(value: string) => labelFor(value)}`) ไม่งั้นพอเลือกแล้วปิด ช่องจะโชว์
+key ภายใน (เช่น `"__all__"`, `"blurry_photo"`) แทนข้อความไทยที่ตัวเลือกนั้น
+แสดงตอนกางอยู่ บั๊กนี้เกิดซ้ำ 2 ครั้งแล้ว — `__all__` ที่ตัวกรองหมวดหมู่ใน
+`app/restaurants/page.tsx` (แก้ตั้งแต่ Task 6) และ `blurry_photo` ที่ dialog
+ปฏิเสธร้านใน `app/admin/restaurants/[id]/review-actions.tsx` (Task 8)
+จุดที่ใช้ `Select` ทั้งโปรเจกต์ (grep `SelectValue` แล้ว) มี 3 จุด — อีกจุด
+คือตัวกรองสถานะใน `app/admin/restaurants/status-filter.tsx` ซึ่งมี mapping
+ถูกต้องอยู่แล้วตั้งแต่สร้าง
+
 ## Target folder structure
 
 No `src/`. `modules/`, `types/`, `constants/` exist but are still empty — no business-logic files have been written yet.
