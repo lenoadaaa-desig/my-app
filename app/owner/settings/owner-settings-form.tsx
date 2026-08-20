@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -53,6 +53,9 @@ function GeneralInfoTab({ restaurant }: { restaurant: OwnerRestaurant }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<ApiError | null>(null);
   const [saved, setSaved] = useState(false);
+  // See CLAUDE.md's note on stale-closure double-submit guards — `saving`
+  // state alone can't block a same-tick double click.
+  const savingRef = useRef(false);
 
   function update<K extends keyof GeneralInfo>(key: K, value: GeneralInfo[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -60,7 +63,7 @@ function GeneralInfoTab({ restaurant }: { restaurant: OwnerRestaurant }) {
   }
 
   async function handleSave() {
-    if (saving) return;
+    if (savingRef.current) return;
     if (!form.name.trim()) {
       setError({ code: "", message: MESSAGES.restaurant.nameRequired });
       return;
@@ -70,6 +73,7 @@ function GeneralInfoTab({ restaurant }: { restaurant: OwnerRestaurant }) {
       return;
     }
 
+    savingRef.current = true;
     setSaving(true);
     setError(null);
     try {
@@ -94,6 +98,7 @@ function GeneralInfoTab({ restaurant }: { restaurant: OwnerRestaurant }) {
     } catch {
       setError({ code: "", message: MESSAGES.common.errorGeneric });
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
   }
@@ -180,6 +185,10 @@ function OpeningHoursTab({ restaurant }: { restaurant: OwnerRestaurant }) {
   const [error, setError] = useState<ApiError | null>(null);
   const [saved, setSaved] = useState(false);
   const [confirmMessage, setConfirmMessage] = useState<string | null>(null);
+  // Guards `submit` itself (not just `handleSave`) since the confirm
+  // dialog's "save anyway" button calls submit(true) directly — see
+  // CLAUDE.md's stale-closure note.
+  const savingRef = useRef(false);
 
   function updateRow(dayOfWeek: number, patch: Partial<OpeningHourRow>) {
     setHours((prev) => prev.map((row) => (row.dayOfWeek === dayOfWeek ? { ...row, ...patch } : row)));
@@ -187,6 +196,8 @@ function OpeningHoursTab({ restaurant }: { restaurant: OwnerRestaurant }) {
   }
 
   async function submit(confirm: boolean) {
+    if (savingRef.current) return;
+    savingRef.current = true;
     setSaving(true);
     setError(null);
     try {
@@ -209,12 +220,13 @@ function OpeningHoursTab({ restaurant }: { restaurant: OwnerRestaurant }) {
     } catch {
       setError({ code: "", message: MESSAGES.common.errorGeneric });
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
   }
 
   function handleSave() {
-    if (saving) return;
+    if (savingRef.current) return;
     setSaved(false);
     submit(false);
   }
@@ -324,6 +336,10 @@ function BookingSettingsTab({ restaurant }: { restaurant: OwnerRestaurant }) {
   const [error, setError] = useState<ApiError | null>(null);
   const [saved, setSaved] = useState(false);
   const [confirmMessage, setConfirmMessage] = useState<string | null>(null);
+  // Guards `submit` itself (not just `handleSave`) since the confirm
+  // dialog's "save anyway" button calls submit(true) directly — see
+  // CLAUDE.md's stale-closure note.
+  const savingRef = useRef(false);
 
   function update<K extends keyof BookingSettingsForm>(key: K, value: BookingSettingsForm[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -348,6 +364,8 @@ function BookingSettingsTab({ restaurant }: { restaurant: OwnerRestaurant }) {
   }
 
   async function submit(confirm: boolean) {
+    if (savingRef.current) return;
+    savingRef.current = true;
     setSaving(true);
     setError(null);
     try {
@@ -378,12 +396,13 @@ function BookingSettingsTab({ restaurant }: { restaurant: OwnerRestaurant }) {
     } catch {
       setError({ code: "", message: MESSAGES.common.errorGeneric });
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
   }
 
   function handleSave() {
-    if (saving) return;
+    if (savingRef.current) return;
     setSaved(false);
     const err = validate();
     setValidationError(err);

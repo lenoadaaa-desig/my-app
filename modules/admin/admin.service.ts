@@ -10,7 +10,7 @@ type ServiceResult<T> =
   | { success: true; data: T }
   | { success: false; error: { code: ErrorCode; message: string } };
 
-type ReviewAction = ReviewRestaurantInput["action"];
+export type ReviewAction = ReviewRestaurantInput["action"];
 
 // Explicit state machine, not nested ifs — booking status will need the same
 // shape (Task 5), so this is the pattern to reuse.
@@ -36,11 +36,42 @@ const ACTION_TARGET_STATUS: Record<ReviewAction, RestaurantStatus> = {
   suspend: RestaurantStatus.SUSPENDED,
 };
 
-export async function listPendingRestaurants(): Promise<Restaurant[]> {
+export type RestaurantWithOwner = Restaurant & {
+  owner: { id: string; email: string | null; fullName: string | null };
+};
+
+// Sort direction depends on the status being queried: PENDING is a queue
+// (oldest submission first is what an admin should clear first); every
+// other status is a completed decision, where "most recently decided" is
+// the useful order. reviewedAt is null for every PENDING row and, in the
+// ordinary app flow, only for PENDING rows — every other status is reached
+// exclusively through reviewRestaurant(), which always sets it. Fixture
+// data can violate that (npm run db:seed inserts rows as APPROVED directly,
+// bypassing reviewRestaurant() and its reviewedAt write), so `nulls: "last"`
+// is explicit rather than relying on Postgres's default NULLS FIRST for
+// DESC — confirmed by querying against the seeded data, whose 3 null-
+// reviewedAt rows sorted before real reviewed ones without this.
+export async function listRestaurantsByStatus(status: RestaurantStatus): Promise<RestaurantWithOwner[]> {
   return prisma.restaurant.findMany({
-    where: { status: RestaurantStatus.PENDING },
-    orderBy: { createdAt: "asc" }, // longest-waiting first
+    where: { status },
+    orderBy:
+      status === RestaurantStatus.PENDING
+        ? { createdAt: "asc" }
+        : { reviewedAt: { sort: "desc", nulls: "last" } },
+    include: { owner: { select: { id: true, email: true, fullName: true } } },
   });
+}
+
+const ALL_ACTIONS = Object.keys(ACTION_TARGET_STATUS) as ReviewAction[];
+
+// Derives which review actions are legal from a given status by reusing
+// ALLOWED_TRANSITIONS/ACTION_TARGET_STATUS above — never a second hardcoded
+// state table. Used to compute the admin detail page's visible buttons
+// server-side (this whole module is "server-only", so a client component
+// can't import ALLOWED_TRANSITIONS directly).
+export function getAllowedActions(status: RestaurantStatus): ReviewAction[] {
+  const allowedStatuses = ALLOWED_TRANSITIONS[status];
+  return ALL_ACTIONS.filter((action) => allowedStatuses.includes(ACTION_TARGET_STATUS[action]));
 }
 
 export async function reviewRestaurant(

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { BookingStatus } from "@prisma/client";
@@ -131,6 +131,10 @@ export function DashboardView({
   );
   const [reasonText, setReasonText] = useState("");
   const [reasonSubmitError, setReasonSubmitError] = useState<string | null>(null);
+  // See CLAUDE.md's note on why a same-tick double click needs a ref, not
+  // state, to block a second in-flight request — `actingId` alone (state)
+  // isn't enough.
+  const actingRef = useRef<string | null>(null);
 
   function handleDateChange(nextDate: string) {
     if (!nextDate) return;
@@ -140,7 +144,8 @@ export function DashboardView({
   }
 
   async function applyStatusChange(bookingId: string, nextStatus: BookingStatus, reason?: string) {
-    if (actingId) return;
+    if (actingRef.current) return;
+    actingRef.current = bookingId;
     setActingId(bookingId);
     setActionError(null);
     try {
@@ -168,6 +173,7 @@ export function DashboardView({
       setActionError({ code: "", message: MESSAGES.common.errorGeneric });
       return false;
     } finally {
+      actingRef.current = null;
       setActingId(null);
     }
   }

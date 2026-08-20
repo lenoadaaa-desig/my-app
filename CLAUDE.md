@@ -73,13 +73,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `npm run db:migrate -- --name <name>` — create + apply a dev migration (never use `prisma db push` — no migration file to track)
 - `npm run db:pull` — introspect the live DB (e.g. `-- --print` to compare without overwriting `schema.prisma`)
 - `npm run db:studio` / `npm run db:seed`
-- `npm test` — run the test suite once (Vitest)
+- `npm test` — run the full test suite once (Vitest, wrapped with `dotenv-cli` reading `.env.local` — most test files hit the live DB directly, so this must load first)
 - `npm run test:watch` — Vitest in watch mode
+- `npm run test:fast` — only `slot.engine.test.ts` + `booking.state.test.ts` (pure-function tests, no DB) — use while iterating on booking-logic changes; still run the full `npm test` before committing, since it's the only one that actually exercises the DB-backed tests (advisory lock, concurrency, RLS-adjacent paths)
 
-All `db:*` scripts wrap the Prisma CLI with `dotenv-cli` reading `.env.local` — never run `npx prisma` directly (see "ข้อจำกัดเวอร์ชัน" below).
+All `db:*` scripts (and `test`/`test:watch`) wrap the underlying CLI with `dotenv-cli` reading `.env.local` — never run `npx prisma` or `npx vitest` directly (see "ข้อจำกัดเวอร์ชัน" below). Running bare `vitest`/`npx vitest run` skips `.env.local` entirely and fails every DB-touching test with `DATABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY` missing — not a real regression, just a reminder that the env didn't load.
 
 Test runner: Vitest (Next 16 แนะนำอย่างเป็นทางการ)
-รันด้วย npm test
+รันด้วย npm test — เต็มชุดใช้เวลา ~2 นาที เพราะแตะ DB จริง
+ระหว่างแก้ตรรกะ booking ใช้ npm run test:fast แทน (เร็วกว่ามาก
+ไม่แตะ DB) แต่ก่อน commit ต้องรัน npm test เต็มชุดเสมอ
 slot.engine.ts เป็น pure function
 ห้าม import prisma และห้ามเรียก new Date() ข้างใน
 ต้องรับ now เข้ามาเป็น parameter เพื่อให้เทสได้
@@ -312,17 +315,97 @@ Prisma CLI อ่าน `.env.local` ไม่ได้ ต้องเรีย
     param ที่เปลี่ยนได้ระหว่างอยู่หน้าเดิม แท็บเป็น client UI state ล้วน),
     `/owner/status` (ไม่มี client component ไหนคัดลอกข้อมูลร้านลง state)
 
+    `app/restaurants/[id]/booking-box.tsx` ก็มี `useState`/`useEffect` ที่ไม่
+    list `restaurantId` ใน dependency คล้ายรูปแบบเดียวกัน แต่**ทดสอบจริงแล้ว
+    ปลอดภัย** (ไม่ใช่แค่วิเคราะห์เฉยๆ): เปิด `/restaurants` กดลิงก์เข้าร้าน 1
+    (เปิด 10:00-22:00 capacity 10) เลือกวันพรุ่งนี้เห็นรอบ 10:00-21:00
+    "เหลือ 10 ที่" ครบ แล้วกดลิงก์ "ค้นหาร้าน" กลับไปหน้า `/restaurants`
+    กดลิงก์เข้าร้าน 2 (เปิด 18:00-02:00 capacity 6) — รอบเวลาที่ขึ้นเปลี่ยน
+    เป็นของร้าน 2 จริงทันที (23:00-01:00 "เหลือ 6 ที่" ไม่ใช่ค้างของร้าน 1)
+    กด back 2 ครั้งกลับไปร้าน 1 เห็นข้อมูลร้าน 1 ถูกต้อง (รีเซ็ตกลับเป็น
+    "วันนี้" ด้วย ไม่ค้างที่วันพรุ่งนี้ที่เคยเลือกไว้ — mount ใหม่จริง) กด
+    forward 2 ครั้งกลับไปร้าน 2 เห็นข้อมูลร้าน 2 ถูกต้องเหมือนเดิม
+    เหตุผลที่ต่างจาก `/owner/dashboard`: `[id]` เป็น dynamic route segment
+    (ส่วนหนึ่งของ path) ไม่ใช่ search param — Next.js remount component ใหม่
+    เมื่อค่า segment เปลี่ยน (ต่างจาก search-param-only navigation บน path
+    เดิมที่ไม่ remount) จึงไม่มีทาง state ค้างข้ามร้านได้ — ไม่ต้องแก้
+
+14. **กันกดซ้ำต้องใช้ `useRef` ไม่ใช่ `useState`** เพราะ state อัปเดต
+    หลัง re-render เท่านั้น — สอง click event ที่เกิดในทิกเดียวกัน (native
+    `.click()` สองครั้งติดกัน ไม่ใช่แค่คลิกเร็ว ๆ ด้วยนิ้ว) ทั้งคู่จะยังอ่านค่า
+    state ตัวเก่าจาก closure ก่อน re-render ทัน ทำให้ `if (saving) return;`
+    (หรือชื่อตัวแปรอะไรก็ตามที่เป็น `useState`) ปล่อยผ่านทั้งสอง handler
+    ต้องเช็ค+ตั้งค่า `useRef` (sync ทันที ไม่รอ re-render) แทน หรือควบคู่กับ
+    state (state ยังไว้ใช้ disable ปุ่มใน UI ได้ปกติ)
+
+    พิสูจน์ด้วย Playwright: `element.evaluate(el => { el.click(); el.click(); })`
+    ยิง native click สองครั้งในทิกเดียวกันจริง ๆ — **การคลิกเร็ว ๆ ผ่าน UI
+    ปกติ หรือ Playwright `.click()` สองครั้งแยกกัน (เช่น
+    `Promise.all([locator.click(), locator.click({force:true})])`) จับบั๊กนี้
+    ไม่ได้** เพราะ actionability-wait ของ `.click()` ปกติกินเวลานานพอให้
+    request แรก round-trip เสร็จและรีเซ็ต guard ก่อนคลิกที่สองจะไปถึงจริง
+    ต้องใช้ native `.click()` สองครั้งในการเรียกเดียว (หรือเทียบเท่า) เท่านั้น
+
+    เจอจริงที่ปุ่ม "ยืนยันการจอง" (`app/restaurants/[id]/booking-box.tsx`)
+    — กดซ้ำในทิกเดียวสร้าง booking จริง 2 รายการแยกกันใน DB (customer/ร้าน/
+    วันที่/รอบเวลาเดียวกัน ห่างกัน ~700ms คนละ `id`/`code`) ไม่ใช่แค่ UI โชว์ผิด
+    เพราะ `pg_advisory_xact_lock` กันแค่จองเกินที่นั่งรวม ไม่ได้กันคนเดียวกัน
+    ส่งซ้ำ 2 คำขอ แก้แล้วด้วย `submittingRef` ทดสอบซ้ำหลังแก้ยืนยันเหลือ
+    1 request/1 booking จริง
+
+    แก้ไปแล้วทุกจุดที่กันกดซ้ำด้วย state ในโปรเจกต์ (ไล่ grep ทั้งโปรเจกต์
+    แล้ว): `app/restaurants/[id]/booking-box.tsx`,
+    `app/owner/dashboard/dashboard-view.tsx`,
+    `app/owner/settings/owner-settings-form.tsx` (ทั้ง 3 แท็บ),
+    `app/owner/register/register-form.tsx`,
+    `app/bookings/my/my-bookings-view.tsx`,
+    `app/owner/status/resubmit-button.tsx`,
+    `app/admin/admin-user-table.tsx` (ใช้ `useTransition` เดิม ไม่มี guard
+    เลยนอกจาก `disabled={isPending}` — เพิ่ม ref guard ให้ด้วยเพื่อความ
+    สม่ำเสมอ), `app/admin/restaurants/[id]/review-actions.tsx` (จุดที่เจอ
+    บั๊กนี้ครั้งแรก)
+
+15. **วันที่ในหน้าแอดมิน (`/admin/restaurants`, `/admin/restaurants/[id]`)
+    แสดงเป็น ค.ศ. ไม่ใช่ พ.ศ.** ทั้งที่ข้อความไทยอื่นในแอปเป็นภาษาไทยทั้งหมด
+    — ตั้งใจ ไม่ใช่ลืมแปลง เพราะ DB (`createdAt`/`reviewedAt`) และ seed data
+    เก็บ/อ้างอิงเป็น ค.ศ. ล้วน ถ้าจอแสดง พ.ศ. (เช่น 2569) แต่ Prisma Studio/
+    log/DB query โชว์ ค.ศ. (2026) จะสับสนตอน debug ว่าตัวเลขไหนตรงกับแถวไหน
+    หน้าจออื่นในแอป (booking date) ไม่เคยโชว์ปีเลยจึงไม่มีบรรทัดฐานให้ขัดแย้ง
+
 ## ปัญหาค้างที่ยังไม่แก้
 
-- Role type ใน `lib/dal.ts` ยังเป็น `"user" | "admin"` ไม่ตรง enum จริง (DB enum คือ `customer`/`owner`/`admin` แล้ว)
-- `admin-user-table.tsx` dropdown ยังเป็น user/admin
-- role check กระจายอยู่ 2 จุด (`app/admin/page.tsx`, `app/admin/actions.ts`)
-- `supabase/rls-and-triggers.sql` เขียนเสร็จแล้วแต่ **ยังไม่ได้ apply ลง DB จริง** —
-  จนกว่าจะ apply ทุกตารางจะเป็น RLS เปิดแบบไม่มี policy (deny-all แม้แต่ SELECT)
-- `Profile` ไม่มี FK ไป `auth.users` ต้องมีฟังก์ชันลบ user
-  ที่ลบทั้ง `auth.users` และ `profiles` พร้อมกัน (ทำใน Task 2)
-- `updated_at` อัปเดตเฉพาะเมื่อแก้ผ่าน Prisma
-  แก้ผ่าน SQL ตรง ๆ จะไม่ขยับ
+_(ตรวจกับโค้ด/DB จริงล่าสุด 2026-08-18 — ของเดิมทั้ง 6 รายการแก้ไปแล้ว
+หรือย้ายไปหมวด "ข้อจำกัดที่ทราบแล้ว" ด้านล่าง รายการที่เหลืออยู่ตอนนี้
+เป็นข้อเท็จจริงใหม่ที่พบระหว่างตรวจรอบนี้)_
+
+- `authService.deleteUser` (`modules/auth/auth.service.ts`) ลบทั้ง `profiles`
+  (ผ่าน Prisma) และ `auth.users` (ผ่าน `adminClient.auth.admin.deleteUser`)
+  พร้อมกันแล้ว แต่ยังไม่มี route/action ไหนเรียกใช้จริง
+  (grep ทั้ง `app/` เจอแค่จุด import `auth.service` สองที่ ไม่มีจุดเรียก
+  `deleteUser`) — ต้องต่อเข้ากับหน้าแอดมิน (Task 8) ถ้าจะให้ลบ user ได้จริง
+
+ทุกครั้งที่แก้ปัญหาในลิสต์นี้ ต้องลบรายการออกทันที
+เอกสารที่ผิดอันตรายกว่าไม่มีเอกสาร
+เพราะทำให้ไปแก้ปัญหาที่ไม่มีอยู่จริง
+
+## ข้อจำกัดที่ทราบแล้ว
+
+- `Profile` ไม่มี FK ไป `auth.users` — ตั้งใจแบบนี้ถาวร ไม่ใช่ของค้างที่จะมาแก้
+  ทีหลัง เพราะ Project rules ข้อ 2 ห้าม Prisma แตะ schema `auth` ของ Supabase
+  เด็ดขาด ผลคือการลบ user ต้องลบสองที่แยกกันเสมอผ่านโค้ดแอป (ดูฟังก์ชัน
+  `deleteUser` ในหมวด "ปัญหาค้างที่ยังไม่แก้" ด้านบน) ไม่มีทางใช้
+  `ON DELETE CASCADE` ระดับ DB ได้
+- `updated_at` อัปเดตเฉพาะเมื่อแก้ผ่าน Prisma — `@updatedAt` ใน
+  `prisma/schema.prisma` เป็นกลไกฝั่ง Prisma client (คำนวณค่าแล้วส่งเป็นส่วน
+  หนึ่งของ UPDATE statement) ไม่ใช่ DB trigger ยืนยันแล้วว่า DB จริงไม่มี
+  trigger/function ใดแตะคอลัมน์นี้เลย แก้ผ่าน SQL ตรง ๆ (เช่น Supabase SQL
+  Editor) จะไม่ขยับค่านี้ ถ้าต้องการรับประกันระดับ DB ต้องเพิ่ม trigger เอง
+  ใน `supabase/rls-and-triggers.sql`
+- backend ไม่กันการจองซ้ำของ customer เดียวกัน ในร้าน/วัน/รอบเดียวกัน —
+  ตั้งใจ เพราะกลุ่มใหญ่เกิน maxPartySize อาจต้องแยกจองหลายโต๊ะในรอบเดียวกัน
+  ซึ่งเป็นการใช้งานที่ถูกต้อง การกดซ้ำโดยไม่ตั้งใจกันด้วย ref guard ฝั่ง
+  client แล้ว (การตัดสินใจสถาปัตยกรรม ข้อ 14) ถ้าวันหนึ่งอยากกัน ให้ใช้ pattern
+  CONFIRMATION_REQUIRED เตือนแล้วให้ยืนยันซ้ำ ไม่ใช่บล็อกเงียบ ๆ
 
 ## Architecture
 

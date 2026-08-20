@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
@@ -27,9 +27,13 @@ export function ResubmitButton({ restaurantId }: { restaurantId: string }) {
   const [open, setOpen] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<ApiError | null>(null);
+  // See CLAUDE.md's stale-closure note — `pending` state alone can't block
+  // a same-tick double click.
+  const pendingRef = useRef(false);
 
   async function confirmResubmit() {
-    if (pending) return;
+    if (pendingRef.current) return;
+    pendingRef.current = true;
     setPending(true);
     setError(null);
     try {
@@ -46,6 +50,7 @@ export function ResubmitButton({ restaurantId }: { restaurantId: string }) {
     } catch {
       setError({ code: "", message: MESSAGES.common.errorGeneric });
     } finally {
+      pendingRef.current = false;
       setPending(false);
     }
   }

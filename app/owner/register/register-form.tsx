@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -76,6 +76,9 @@ export function RegisterForm() {
   const [stepError, setStepError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<ApiError | null>(null);
+  // See CLAUDE.md's stale-closure note — `submitting` state alone can't
+  // block a same-tick double click.
+  const submittingRef = useRef(false);
 
   function update<K extends keyof FormData>(key: K, value: FormData[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -102,7 +105,8 @@ export function RegisterForm() {
   }
 
   async function handleSubmit() {
-    if (submitting) return;
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     setSubmitting(true);
     setSubmitError(null);
 
@@ -130,6 +134,7 @@ export function RegisterForm() {
     } catch {
       setSubmitError({ code: "", message: MESSAGES.common.errorGeneric });
     } finally {
+      submittingRef.current = false;
       setSubmitting(false);
     }
   }

@@ -291,6 +291,71 @@ export const MESSAGES = {
       allowed.length > 0
         ? `สถานะปัจจุบันคือ "${current}" ไม่สามารถเปลี่ยนเป็นสถานะนี้ได้ (เปลี่ยนได้เฉพาะเป็น: ${allowed.join(", ")})`
         : `สถานะปัจจุบันคือ "${current}" ไม่สามารถเปลี่ยนสถานะได้อีก`,
+
+    manageRestaurantsLink: "จัดการร้านอาหาร",
+    manageUsersTitle: "จัดการผู้ใช้",
+
+    // Queue page (/admin/restaurants)
+    queueTitle: "คิวอนุมัติร้าน",
+    statusFilterLabel: "กรองตามสถานะ",
+    columnRestaurant: "ชื่อร้าน",
+    columnOwner: "เจ้าของ",
+    columnSubmittedAt: "วันที่ส่ง",
+    columnWaiting: "รอมาแล้ว",
+    columnReviewedAt: "ตรวจเมื่อ",
+    daysWaiting: (days: number) => `${days} วัน`,
+    reviewedAtEmpty: "-",
+    queueEmptyTitle: "ไม่มีร้านในสถานะนี้",
+    queueEmptyHint: "ลองเปลี่ยนตัวกรองสถานะด้านบน",
+    backToQueue: "กลับไปคิว",
+
+    // Detail page (/admin/restaurants/[id])
+    ownerLabel: "เจ้าของร้าน",
+    openingHoursTitle: "เวลาทำการ",
+    bookingSettingsTitle: "ตั้งค่าการจอง",
+    slotDurationLabel: "ความยาวรอบ (นาที)",
+    capacityPerSlotLabel: "ที่นั่งต่อรอบ",
+    maxPartySizeLabel: "จำนวนคนต่อโต๊ะสูงสุด",
+    advanceDaysLabel: "จองล่วงหน้าได้ (วัน)",
+    minLeadHoursLabel: "ต้องจองล่วงหน้าอย่างน้อย (ชั่วโมง)",
+    autoConfirmLabel: "ยืนยันการจองอัตโนมัติ",
+    autoConfirmYes: "เปิด",
+    autoConfirmNo: "ปิด",
+    bookingSettingsEmpty: "ร้านนี้ยังไม่มีการตั้งค่าการจอง",
+
+    previousRejectionTitle: "เหตุผลจากการปฏิเสธครั้งก่อน",
+    previousRejectionHint:
+      "ร้านนี้เคยถูกปฏิเสธมาก่อนด้วยเหตุผลนี้ ตรวจสอบว่าปัญหาที่เคยพบได้รับการแก้ไขแล้วหรือยัง",
+
+    // Checklist is a memory aid only — see the component's own comment for
+    // why it must never gate the action buttons.
+    checklistTitle: "เช็คลิสต์ก่อนอนุมัติ (ไม่บังคับติ๊ก)",
+    checklistItemInfoComplete: "ข้อมูลครบถ้วน",
+    checklistItemRealPhotos: "รูปเป็นร้านจริง",
+    checklistItemContactable: "เบอร์ติดต่อได้",
+    checklistItemAddressReasonable: "ที่อยู่สมเหตุสมผล",
+
+    approveButton: "อนุมัติ",
+    rejectButton: "ปฏิเสธ",
+    suspendButton: "ระงับ",
+    actionPending: "กำลังดำเนินการ...",
+
+    actionSuccessApprove: "อนุมัติร้านนี้แล้ว",
+    actionSuccessReject: "ปฏิเสธร้านนี้แล้ว",
+    actionSuccessSuspend: "ระงับร้านนี้แล้ว",
+
+    rejectDialogTitle: "ปฏิเสธร้านนี้",
+    rejectDialogDescription: "เลือกเหตุผลที่ใช้บ่อย หรือเลือก \"อื่น ๆ\" เพื่อพิมพ์เอง",
+    rejectReasonSelectLabel: "เหตุผล",
+    rejectReasonBlurryPhoto: "รูปไม่ชัด",
+    rejectReasonIncompleteInfo: "ข้อมูลไม่ครบ",
+    rejectReasonUnreachable: "ติดต่อไม่ได้",
+    rejectReasonDuplicate: "ร้านซ้ำ",
+    rejectReasonNotARestaurant: "ไม่ใช่ร้านอาหาร",
+    rejectReasonOther: "อื่น ๆ",
+    rejectReasonOtherPlaceholder: "ระบุเหตุผล...",
+    rejectDialogCancel: "ยกเลิก",
+    rejectDialogConfirm: "ยืนยันปฏิเสธ",
   },
 } as const;
 
@@ -305,6 +370,20 @@ export const RESTAURANT_STATUS_LABELS_TH: Record<string, string> = {
   APPROVED: "อนุมัติแล้ว",
   REJECTED: "ถูกปฏิเสธ",
   SUSPENDED: "ถูกระงับ",
+};
+
+// Semantic color token each restaurant status renders with — mirrors
+// BOOKING_STATUS_COLORS's separation from its *_LABELS_TH sibling (see that
+// map's comment): admin.service.ts imports RESTAURANT_STATUS_LABELS_TH as
+// plain strings for invalidTransition(...), so this stays a separate map.
+export const RESTAURANT_STATUS_COLORS: Record<
+  string,
+  "ok" | "warn" | "bad" | "sky" | "ink-mute"
+> = {
+  PENDING: "warn",
+  APPROVED: "ok",
+  REJECTED: "bad",
+  SUSPENDED: "bad",
 };
 
 // Index = OpeningHour.dayOfWeek / calendarDayOfWeek() (0 = Sunday ... 6 =

@@ -235,12 +235,23 @@ export async function getRestaurantById(
 export async function getRestaurantForOwner(
   id: string,
   viewer: Profile
-): Promise<(RestaurantWithOpeningHours & { bookingSetting: BookingSetting | null }) | null> {
+): Promise<
+  | (RestaurantWithOpeningHours & {
+      bookingSetting: BookingSetting | null;
+      owner: { id: string; email: string | null; fullName: string | null };
+    })
+  | null
+> {
   const restaurant = await prisma.restaurant.findUnique({
     where: { id },
     include: {
       openingHours: { orderBy: { dayOfWeek: "asc" } },
       bookingSetting: true,
+      // Only /admin/restaurants/[id] (Task 8) reads this field —
+      // /owner/settings (the other caller) already knows who the viewer is,
+      // it just doesn't use it. Harmless extra data on that path, and
+      // avoids a second query/service function for the admin page.
+      owner: { select: { id: true, email: true, fullName: true } },
     },
   });
   if (!restaurant) {

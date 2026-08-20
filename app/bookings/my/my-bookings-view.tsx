@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -79,6 +79,9 @@ export function MyBookingsView({ initialData }: { initialData: MyBookings }) {
   // left open doesn't let the cancel button stay enabled past its real
   // deadline. Same idiom as app/restaurants/[id]/booking-box.tsx's nowTick.
   const [nowTick, setNowTick] = useState(() => Date.now());
+  // See CLAUDE.md's stale-closure note — `cancelling` state alone can't
+  // block a same-tick double click.
+  const cancellingRef = useRef(false);
 
   useEffect(() => {
     const interval = setInterval(() => setNowTick(Date.now()), NOW_TICK_INTERVAL_MS);
@@ -86,7 +89,8 @@ export function MyBookingsView({ initialData }: { initialData: MyBookings }) {
   }, []);
 
   async function confirmCancel() {
-    if (!cancelTarget || cancelling) return;
+    if (!cancelTarget || cancellingRef.current) return;
+    cancellingRef.current = true;
     setCancelling(true);
     setCancelError(null);
 
@@ -111,6 +115,7 @@ export function MyBookingsView({ initialData }: { initialData: MyBookings }) {
     } catch {
       setCancelError({ code: "", message: MESSAGES.common.errorGeneric });
     } finally {
+      cancellingRef.current = false;
       setCancelling(false);
     }
   }

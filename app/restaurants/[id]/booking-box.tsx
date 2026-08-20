@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { Minus, Plus, Loader2 } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -67,6 +67,15 @@ export function BookingBox({ restaurantId, restaurantStatus, openingHours, isLog
   const [submitError, setSubmitError] = useState<ApiError | null>(null);
   const [successBooking, setSuccessBooking] = useState<BookingResult | null>(null);
   const [nowTick, setNowTick] = useState(() => Date.now());
+  // `submitting` state alone can't block a genuinely-same-tick double
+  // click: two click events handled in the same JS turn both read
+  // `submitting` from before either call's setSubmitting(true) has
+  // reached a re-render, so both pass an `if (submitting) return` check.
+  // A ref is mutated synchronously, so the second invocation always sees
+  // it set by the first. See CLAUDE.md's note on this pattern — confirmed
+  // for real here: a double-click created two separate bookings for the
+  // same customer/restaurant/date/slot in the database, not just a UI glitch.
+  const submittingRef = useRef(false);
 
   useEffect(() => {
     const interval = setInterval(() => setNowTick(Date.now()), NOW_TICK_INTERVAL_MS);
@@ -198,7 +207,8 @@ export function BookingBox({ restaurantId, restaurantStatus, openingHours, isLog
   }
 
   async function handleSubmit() {
-    if (!effectiveSlotTime || submitting) return;
+    if (!effectiveSlotTime || submittingRef.current) return;
+    submittingRef.current = true;
 
     setSubmitting(true);
     setSubmitError(null);
@@ -229,6 +239,7 @@ export function BookingBox({ restaurantId, restaurantStatus, openingHours, isLog
     } catch {
       setSubmitError({ code: "", message: MESSAGES.common.errorGeneric });
     } finally {
+      submittingRef.current = false;
       setSubmitting(false);
     }
   }
