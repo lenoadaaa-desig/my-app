@@ -25,6 +25,17 @@ let changeBookingStatus: typeof import("./booking.service").changeBookingStatus;
 let getMyBookings: typeof import("./booking.service").getMyBookings;
 let getRestaurantBookings: typeof import("./booking.service").getRestaurantBookings;
 
+// Unique to this file — Vitest runs test files in parallel by default, and
+// restaurant.service.test.ts creates its own "test"-marked restaurants at
+// the same time against the same real DB. A shared marker here would let
+// this file's self-cleanup below delete rows the other file is mid-test
+// with, causing flaky failures that only reproduce when both files happen
+// to race (see CLAUDE.md's note on this — found via 27 leaked "[test]
+// restaurant" rows reaching the public /restaurants search after a killed
+// test run, which is what self-cleanup below fixes for next time).
+const TEST_MARKER = "test:booking";
+const TEST_EMAIL_DOMAIN = "test-booking.local";
+
 const createdRestaurantIds: string[] = [];
 const createdProfileIds: string[] = [];
 
@@ -35,6 +46,22 @@ beforeAll(async () => {
 
   ({ prisma } = await import("@/lib/prisma"));
   ({ createBooking, changeBookingStatus, getMyBookings, getRestaurantBookings } = await import("./booking.service"));
+
+  // Recovers from a previous run of *this file* being killed (Ctrl+C,
+  // timeout, crash) before its own afterAll got to run — afterAll alone
+  // only ever cleans up rows the *current* process created, tracked in the
+  // in-memory arrays above, so it can never see a previous process's
+  // leftovers. Scoped to TEST_MARKER/TEST_EMAIL_DOMAIN (unique to this
+  // file) so it can't touch restaurant.service.test.ts's concurrently-
+  // running fixtures.
+  const leakedRestaurantIds = (
+    await prisma.restaurant.findMany({ where: { category: TEST_MARKER }, select: { id: true } })
+  ).map((r) => r.id);
+  if (leakedRestaurantIds.length > 0) {
+    await prisma.booking.deleteMany({ where: { restaurantId: { in: leakedRestaurantIds } } });
+    await prisma.restaurant.deleteMany({ where: { id: { in: leakedRestaurantIds } } });
+  }
+  await prisma.profile.deleteMany({ where: { email: { endsWith: `@${TEST_EMAIL_DOMAIN}` } } });
 });
 
 afterAll(async () => {
@@ -61,7 +88,7 @@ type TestRestaurantOptions = {
 async function createTestRestaurant(opts: TestRestaurantOptions = {}) {
   const ownerId = randomUUID();
   await prisma.profile.create({
-    data: { id: ownerId, email: `owner-${ownerId}@test.local`, role: PrismaRole.OWNER },
+    data: { id: ownerId, email: `owner-${ownerId}@${TEST_EMAIL_DOMAIN}`, role: PrismaRole.OWNER },
   });
   createdProfileIds.push(ownerId);
 
@@ -69,7 +96,7 @@ async function createTestRestaurant(opts: TestRestaurantOptions = {}) {
     data: {
       ownerId,
       name: `[test] restaurant ${ownerId}`,
-      category: "test",
+      category: TEST_MARKER,
       status: opts.status ?? RestaurantStatus.APPROVED,
     },
   });
@@ -105,7 +132,7 @@ async function createTestRestaurant(opts: TestRestaurantOptions = {}) {
 async function createTestCustomer() {
   const id = randomUUID();
   await prisma.profile.create({
-    data: { id, email: `customer-${id}@test.local`, role: PrismaRole.CUSTOMER },
+    data: { id, email: `customer-${id}@${TEST_EMAIL_DOMAIN}`, role: PrismaRole.CUSTOMER },
   });
   createdProfileIds.push(id);
   return id;
@@ -114,7 +141,7 @@ async function createTestCustomer() {
 async function createTestAdmin() {
   const id = randomUUID();
   await prisma.profile.create({
-    data: { id, email: `admin-${id}@test.local`, role: PrismaRole.ADMIN },
+    data: { id, email: `admin-${id}@${TEST_EMAIL_DOMAIN}`, role: PrismaRole.ADMIN },
   });
   createdProfileIds.push(id);
   return id;

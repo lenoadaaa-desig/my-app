@@ -16,7 +16,8 @@
     "db:generate": "dotenv -e .env.local -- prisma generate",
     "db:studio": "dotenv -e .env.local -- prisma studio",
     "db:seed": "dotenv -e .env.local -- prisma db seed",
-    "seed:demo": "dotenv -e .env.local -- tsx --conditions=react-server scripts/seed-demo.ts"
+    "seed:demo": "dotenv -e .env.local -- tsx --conditions=react-server scripts/seed-demo.ts",
+    "db:clean-test": "dotenv -e .env.local -- tsx scripts/clean-test-data.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

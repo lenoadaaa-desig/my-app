@@ -1,11 +1,12 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { BookingStatus } from "@prisma/client";
 import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -23,6 +24,7 @@ import { MESSAGES, ERROR_MESSAGES_TH } from "@/constants/messages";
 import { ALLOWED_BOOKING_TRANSITIONS, OWNER_ALLOWED_TARGET_STATUSES } from "@/modules/booking/booking.state";
 import type { RestaurantBooking } from "@/modules/booking/booking.service";
 import type { Slot } from "@/modules/booking/slot.engine";
+import { cn } from "@/lib/utils";
 
 type ApiError = { code: string; message: string };
 type ApiResult<T> = { success: true; data: T } | { success: false; error: ApiError };
@@ -99,12 +101,14 @@ function SlotsOverview({ slots }: { slots: Slot[] }) {
 export function DashboardView({
   restaurantId,
   date,
+  isApproved,
   initialBookings,
   initialBookingsError,
   slots,
 }: {
   restaurantId: string;
   date: string;
+  isApproved: boolean;
   initialBookings: RestaurantBooking[];
   initialBookingsError: string | null;
   slots: Slot[];
@@ -235,12 +239,37 @@ export function DashboardView({
         ))}
       </div>
 
-      <Card>
-        <CardContent className="flex flex-col gap-2">
-          <p className="text-sm font-medium text-ink">{MESSAGES.owner.dashboardSlotsTitle}</p>
-          <SlotsOverview slots={slots} />
-        </CardContent>
-      </Card>
+      {/* Slot numbers only mean anything for an APPROVED restaurant —
+          getAvailableSlots reasons purely about hours/capacity/bookings,
+          not approval status, so a REJECTED/PENDING/SUSPENDED restaurant
+          would otherwise show real-looking "21:00 เหลือ 40 ที่" slots that
+          no customer can actually book (createBooking blocks anything but
+          APPROVED). Hiding the whole card is safer than showing it with a
+          caveat — misleading numbers here are worse than no numbers at all,
+          same reasoning as the admin queue's per-filter column (CLAUDE.md).
+          The booking list/stats above still render normally regardless:
+          a restaurant that used to be APPROVED and got suspended can still
+          have real bookings that need managing. */}
+      {isApproved ? (
+        <Card>
+          <CardContent className="flex flex-col gap-2">
+            <p className="text-sm font-medium text-ink">{MESSAGES.owner.dashboardSlotsTitle}</p>
+            <SlotsOverview slots={slots} />
+          </CardContent>
+        </Card>
+      ) : (
+        <Card>
+          <CardContent className="flex flex-col items-center gap-2 py-6 text-center">
+            <p className="text-sm text-ink-soft">{MESSAGES.owner.dashboardNotApprovedMessage}</p>
+            <Link
+              href={`/owner/status?restaurantId=${restaurantId}`}
+              className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+            >
+              {MESSAGES.owner.dashboardCheckStatusLink}
+            </Link>
+          </CardContent>
+        </Card>
+      )}
 
       {actionError && <p className="text-sm text-bad">{errorText(actionError)}</p>}
 

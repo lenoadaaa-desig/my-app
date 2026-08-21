@@ -1,7 +1,9 @@
 import Link from "next/link";
+import { RestaurantStatus } from "@prisma/client";
 import { getProfile } from "@/lib/dal";
 import * as restaurantService from "@/modules/restaurant/restaurant.service";
 import { buttonVariants } from "@/components/ui/button";
+import { RestaurantStatusBadge } from "@/components/restaurant-status-badge";
 import { MESSAGES } from "@/constants/messages";
 import { cn } from "@/lib/utils";
 import { OwnerSettingsForm } from "./owner-settings-form";
@@ -47,10 +49,17 @@ export default async function OwnerSettingsPage({
                 key={r.id}
                 href={`/owner/settings?restaurantId=${r.id}`}
                 className={cn(
-                  buttonVariants({ variant: r.id === restaurant.id ? "default" : "outline", size: "sm" })
+                  buttonVariants({ variant: r.id === restaurant.id ? "default" : "outline", size: "sm" }),
+                  // Same truncate-anchor fix as app/owner/dashboard/page.tsx's
+                  // selector — see that file's comment for why justify-start
+                  // + min-w-0 (not just max-width) are both required.
+                  "min-w-0 max-w-48 justify-start gap-1.5 sm:max-w-64"
                 )}
               >
-                {r.name}
+                <span className="truncate">{r.name}</span>
+                {r.status !== RestaurantStatus.APPROVED && (
+                  <RestaurantStatusBadge status={r.status} />
+                )}
               </Link>
             ))}
           </div>

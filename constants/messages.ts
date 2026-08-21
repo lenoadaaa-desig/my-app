@@ -280,6 +280,8 @@ export const MESSAGES = {
     dashboardCancelConfirm: "ยืนยันยกเลิก",
     dashboardSlotsTitle: "มุมมองรายรอบ",
     dashboardSlotsEmpty: "ไม่มีรอบเวลาสำหรับวันที่เลือก (ร้านปิดหรือยังไม่ตั้งค่าการจอง)",
+    dashboardNotApprovedMessage: "ร้านนี้ยังไม่เปิดรับจอง ลูกค้าจึงยังจองไม่ได้ — ตัวเลขรอบเวลาด้านล่างจะไม่มีความหมายจนกว่าร้านจะได้รับการอนุมัติ",
+    dashboardCheckStatusLink: "ดูสถานะการอนุมัติร้าน",
   },
 
   admin: {

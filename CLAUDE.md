@@ -98,6 +98,19 @@ bump `connection_limit` ผ่าน dynamic import ก่อน `lib/prisma.ts`
 ถูกสร้าง, และ `createBooking`'s advisory lock ถูกปิดชั่วคราวเพื่อยืนยัน
 ว่าเทสจับ overbooking ได้จริงก่อนจะกู้กลับ)
 
+cleanup ที่พึ่ง id ใน array ในหน่วยความจำจะพังทุกครั้งที่ process ถูกฆ่า
+กลางคัน (Ctrl+C, timeout, crash) ต้องมี beforeAll ที่ล้างจาก marker คงที่
+ด้วยเสมอ ไม่ใช่พึ่ง afterAll อย่างเดียว และ marker ต้องแยกต่อไฟล์ เพราะ
+Vitest รันไฟล์เทสแบบขนานเป็นค่าเริ่มต้น — marker เดียวกันข้ามไฟล์ทำให้ไฟล์
+ที่เริ่มทีหลังลบข้อมูลของไฟล์ที่กำลังรันอยู่ เทสพังแบบสุ่ม หาสาเหตุยากที่สุด
+ในบรรดาบั๊กทั้งหมด (`restaurant.service.test.ts` ใช้ `"test:restaurant"` /
+`test-restaurant.local`, `booking.service.test.ts` ใช้ `"test:booking"` /
+`test-booking.local`) เคยเกิดจริง: 27 ร้านทดสอบรั่วเข้าหน้าค้นหาสาธารณะ
+(`npm test` ถูกขัดจังหวะกลางคัน `afterAll` เลยไม่ได้รัน) กู้คืนด้วย
+`npm run db:clean-test` (`scripts/clean-test-data.ts` — รายงานจำนวนที่จะ
+ลบแล้วรอพิมพ์ "yes" ก่อนเสมอ ปฏิเสธรันถ้า `NODE_ENV=production`) ตั้งใจไม่ให้
+เป็น pretest hook อัตโนมัติ เพราะการลบข้อมูลโดยไม่มีใครสั่งเสี่ยงเกินไป
+
 `server-only` ไม่มีอยู่จริงใน node_modules — Next.js alias ให้เองตอน
 build/dev เท่านั้น (ผ่าน "react-server" export condition) Vitest ไม่มี
 alias นี้ ต้อง alias เฉพาะใน `vitest.config.ts` ไปที่

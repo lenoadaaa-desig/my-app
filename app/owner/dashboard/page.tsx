@@ -1,9 +1,11 @@
 import Link from "next/link";
+import { RestaurantStatus } from "@prisma/client";
 import { getProfile } from "@/lib/dal";
 import * as restaurantService from "@/modules/restaurant/restaurant.service";
 import * as bookingService from "@/modules/booking/booking.service";
 import { bangkokToday, formatCalendarDateString } from "@/lib/datetime";
 import { buttonVariants } from "@/components/ui/button";
+import { RestaurantStatusBadge } from "@/components/restaurant-status-badge";
 import { MESSAGES } from "@/constants/messages";
 import { cn } from "@/lib/utils";
 import { DashboardView } from "./dashboard-view";
@@ -36,13 +38,26 @@ export default async function OwnerDashboardPage({
   // server's local timezone.
   const date = dateParam ?? formatCalendarDateString(bangkokToday());
 
+  // createBooking rejects any restaurant that isn't APPROVED (see
+  // modules/booking/booking.service.ts), but getAvailableSlots itself
+  // doesn't know or care about approval status — it only reasons about
+  // opening hours/capacity/existing bookings. Left unchecked here, a
+  // REJECTED/PENDING/SUSPENDED restaurant would show real-looking open
+  // slots ("21:00 เหลือ 40 ที่") that no customer can actually book,
+  // making the owner think the restaurant is live and wait for
+  // reservations that will never come. Skip the fetch entirely rather than
+  // fetch-then-hide — it's meaningless data for this restaurant right now.
+  const isApproved = selected.status === RestaurantStatus.APPROVED;
+
   const [bookingsResult, slotsResult] = await Promise.all([
     bookingService.getRestaurantBookings(selected.id, profile.id, date),
     // Reuses the exact same service function GET /api/restaurants/[id]/slots
     // itself calls, rather than this server component fetching its own API
     // route over HTTP — same pattern every other owner/customer page in
     // this project already follows.
-    bookingService.getAvailableSlots(selected.id, date, profile),
+    isApproved
+      ? bookingService.getAvailableSlots(selected.id, date, profile)
+      : Promise.resolve({ success: true as const, data: [] }),
   ]);
 
   return (
@@ -64,15 +79,30 @@ export default async function OwnerDashboardPage({
                   // full single-line content width — inside a flex-wrap row
                   // that only wraps whole *items* to a new row, not text within
                   // one, an unbounded item like this forces the entire page
-                  // wider than the viewport. `truncate` (not line-clamp-1: that
-                  // utility switches display to -webkit-box, which would kill
-                  // this element's own items-center/justify-center flex
-                  // centering from buttonVariants) plus an explicit max-width
-                  // gives the browser something to actually truncate against.
-                  "max-w-36 truncate sm:max-w-56"
+                  // wider than the viewport. An explicit max-width gives the
+                  // browser something to truncate against, and min-w-0
+                  // overrides the flex item's default min-width:auto (which
+                  // would otherwise keep it at its content width regardless
+                  // of max-width). buttonVariants' own `justify-center`
+                  // centers this link's children — fine for short labels,
+                  // but combined with truncate's overflow:hidden on a name
+                  // wider than max-width, the browser clips *both* ends of
+                  // the centered text instead of just the end (confirmed:
+                  // was rendering "มคลองบางกอกน้อยสไตล์ครอบครัวสำหรับง", a
+                  // slice from the middle of the real name, not the start).
+                  // `justify-start` on the truncated span fixes the anchor
+                  // to the left so only the end gets cut, like normal text
+                  // truncation. line-clamp-1 isn't an option here (see
+                  // components/restaurant-card.tsx's own note) — it switches
+                  // display to -webkit-box, which would break this link's
+                  // own flex layout.
+                  "min-w-0 max-w-48 justify-start gap-1.5 sm:max-w-64"
                 )}
               >
-                {r.name}
+                <span className="truncate">{r.name}</span>
+                {r.status !== RestaurantStatus.APPROVED && (
+                  <RestaurantStatusBadge status={r.status} />
+                )}
               </Link>
             ))}
           </div>
@@ -91,6 +121,7 @@ export default async function OwnerDashboardPage({
         key={`${selected.id}-${date}`}
         restaurantId={selected.id}
         date={date}
+        isApproved={isApproved}
         initialBookings={bookingsResult.success ? bookingsResult.data : []}
         initialBookingsError={bookingsResult.success ? null : bookingsResult.error.message}
         slots={slotsResult.success ? slotsResult.data : []}
