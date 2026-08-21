@@ -111,6 +111,15 @@ Vitest รันไฟล์เทสแบบขนานเป็นค่า�
 ลบแล้วรอพิมพ์ "yes" ก่อนเสมอ ปฏิเสธรันถ้า `NODE_ENV=production`) ตั้งใจไม่ให้
 เป็น pretest hook อัตโนมัติ เพราะการลบข้อมูลโดยไม่มีใครสั่งเสี่ยงเกินไป
 
+สคริปต์ทุกตัวใน `scripts/` ที่เขียนข้อมูล (สร้าง/ลบ/แก้) ต้องมี guard
+ปฏิเสธรันถ้า `NODE_ENV === "production"` เสมอ ไม่ว่าจะดูปลอดภัยแค่ไหนก็ตาม
+— `scripts/seed-demo.ts` สร้าง profile ที่ไม่มี auth user จริงใน Supabase
+(ดู "การตัดสินใจสถาปัตยกรรม" ข้อ 3 — ปกติ `Profile.id` ต้องตรงกับ
+`auth.users.id` เสมอ) ถ้าเผลอรันบน production จะได้ผู้ใช้ผีที่ล็อกอินไม่ได้
+ปนอยู่จริงในฐานข้อมูลจริง `scripts/clean-test-data.ts` (ด้านบน) มี guard นี้
+ตั้งแต่สร้าง ส่วน `seed-demo.ts` เพิ่มทีหลัง — เช็คทุกครั้งที่เพิ่มสคริปต์ใหม่
+ใน `scripts/`
+
 `server-only` ไม่มีอยู่จริงใน node_modules — Next.js alias ให้เองตอน
 build/dev เท่านั้น (ผ่าน "react-server" export condition) Vitest ไม่มี
 alias นี้ ต้อง alias เฉพาะใน `vitest.config.ts` ไปที่

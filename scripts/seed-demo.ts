@@ -28,6 +28,11 @@
 import { PrismaClient, RestaurantStatus, BookingStatus } from "@prisma/client";
 import { setUserRole } from "@/modules/auth/auth.service";
 
+if (process.env.NODE_ENV === "production") {
+  console.error("Refusing to run: NODE_ENV=production. This script writes demo data (including a profile with no matching Supabase auth user) and must never run against production.");
+  process.exit(1);
+}
+
 const prisma = new PrismaClient();
 
 const OWNER_EMAIL = "leno.adaaa@gmail.com";
