@@ -63,9 +63,20 @@ export default function Page() {
   return (
     <div className="bg-canvas">
       <div className="relative isolate px-6 pt-14 lg:px-8">
+        {/* Decorative only (aria-hidden already says so to screen readers,
+            but that doesn't stop it from receiving mouse clicks) — its
+            negative top offset bleeds this box up past the isolate
+            boundary here into where <SiteHeader> renders (a separate DOM
+            subtree, mounted by app/layout.tsx before {children}, so -z-10
+            here can't push it below the header — z-index only orders
+            elements within the same stacking context). Without
+            pointer-events-none this div silently ate every click on the
+            nav links sitting visually above it — confirmed via
+            document.elementFromPoint() at the link's own coordinates
+            returning this div, not the <a>. */}
         <div
           aria-hidden="true"
-          className="absolute inset-x-0 -top-40 -z-10 transform-gpu overflow-hidden blur-3xl sm:-top-80"
+          className="pointer-events-none absolute inset-x-0 -top-40 -z-10 transform-gpu overflow-hidden blur-3xl sm:-top-80"
         >
           <div
             style={{
@@ -126,9 +137,13 @@ export default function Page() {
         </dl>
       </div>
 
+      {/* Same decorative-only div as the hero's blob above — pointer-events-none
+          for the same reason (see that comment). This one sits lower on the
+          page, but it's the identical pattern, so it gets the identical guard
+          rather than leaving one of the two silently unprotected. */}
       <div
         aria-hidden="true"
-        className="absolute inset-x-0 top-[calc(100%-13rem)] -z-10 transform-gpu overflow-hidden blur-3xl sm:top-[calc(100%-30rem)]"
+        className="pointer-events-none absolute inset-x-0 top-[calc(100%-13rem)] -z-10 transform-gpu overflow-hidden blur-3xl sm:top-[calc(100%-30rem)]"
       >
         <div
           style={{
