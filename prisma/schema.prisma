@@ -46,7 +46,18 @@ model Profile {
   // ถ้าลบ user ใน Supabase Auth ต้องลบ Profile ด้วยในโค้ด
   // ไม่งั้นจะเหลือแถวกำพร้าที่ล็อกอินไม่ได้
   id        String   @id @db.Uuid
-  email     String?
+  // @unique since 2026-08-23 — a pair of rows shared demo-customer@example.com
+  // for a week undetected (one from scripts/seed-demo.ts, one created by an
+  // earlier magic-link browser test targeting the same email — Supabase
+  // happily minted a new auth user for it since nothing there checks
+  // `profiles` first). Postgres allows multiple NULLs under a unique
+  // constraint (each NULL is distinct), so this doesn't block signups that
+  // haven't set an email yet. If a future signup throws a unique-violation
+  // here, don't just retry — it means an old orphaned/duplicate profile row
+  // already holds that email; find and resolve it first (see CLAUDE.md's
+  // "ปัญหาค้างที่ยังไม่แก้" note this replaced for how the original pair was
+  // diagnosed and which one was kept).
+  email     String?  @unique
   role      Role     @default(CUSTOMER)
   fullName  String?  @map("full_name")
   phone     String?
@@ -57,6 +68,21 @@ model Profile {
   reviewedRestaurants Restaurant[] @relation("RestaurantReviewer")
   bookings            Booking[]
 
+  // Task 8 phase 2 (admin user list) — two different query shapes, measured
+  // separately via EXPLAIN (ANALYZE, BUFFERS) against 2,500 synthetic rows,
+  // not assumed:
+  // - role alone (e.g. counting/filtering by role with no sort): role='X'
+  //   used this index directly (Index Scan / Index Only Scan for the wider
+  //   "owner" role, ~4 buffers) — the two columns are NOT redundant with
+  //   each other, they serve different queries.
+  // - the default paginated listing (WHERE role=X ORDER BY createdAt DESC
+  //   LIMIT n): the planner used the createdAt index for an Index Scan
+  //   Backward and applied role as a residual filter, skipping the role
+  //   index entirely for this shape — before either index existed this was
+  //   Seq Scan + a top-N heapsort (81-84 buffers); after, 20-25 buffers,
+  //   ~9x faster, no sort step at all.
+  @@index([role])
+  @@index([createdAt])
   @@map("profiles")
 }
 
@@ -83,6 +109,19 @@ model Restaurant {
   closures       Closure[]
 
   @@index([status])
+  // Postgres does not auto-index FK columns — confirmed via pg_indexes that
+  // ownerId had none. Measured (EXPLAIN ANALYZE, 500 synthetic restaurants,
+  // 20-id lookup — the admin user list's per-user "restaurants owned"
+  // count, Task 8 phase 2): Seq Scan, 8 buffers -> Bitmap Heap/Index Scan,
+  // 5 buffers. Smaller improvement than Profile's/Booking's indexes at this
+  // row count (500 rows is cheap to seq-scan either way), kept anyway
+  // because (a) this runs once per row of the admin user list, so it
+  // compounds as the user count grows, and (b) a missing index on a FK
+  // column makes deleting the referenced Profile slower (Postgres must
+  // scan restaurants for rows pointing at it before the FK check can
+  // clear it) — directly relevant to the delete-user feature this same
+  // task adds.
+  @@index([ownerId])
   @@map("restaurants")
 }
 
@@ -107,6 +146,19 @@ model Booking {
 
   @@index([restaurantId, bookingDate, slotTime])
   @@index([customerId, bookingDate])
+  // Cross-restaurant aggregate filtered/grouped by date alone (the admin
+  // dashboard's 30-day trend + no-show rate, Task 8 phase 2) — measured via
+  // EXPLAIN (ANALYZE, BUFFERS) against 30,000 synthetic rows, not assumed.
+  // Correction: an earlier version of this comment claimed the two indexes
+  // above "don't help" this query at all — that was wrong. The planner DID
+  // use (customerId, bookingDate) even though bookingDate isn't its
+  // leading column, via an Index Cond that scans the whole index and
+  // checks bookingDate on every entry rather than seeking directly to the
+  // matching range: 2,121 buffers, 3.6ms, HashAggregate over Index Scan.
+  // With this dedicated index: 6 buffers (~350x fewer), 0.8ms, GroupAggregate
+  // over an Index Only Scan (no heap access at all). The old index worked,
+  // just far less efficiently than a purpose-built one.
+  @@index([bookingDate, status])
   @@map("bookings")
 }
 

@@ -1,3 +1,5 @@
+import { MONTH_SHORT_TH } from "@/constants/messages";
+
 // Asia/Bangkok has held a fixed UTC+7 offset since 1920 and never observes
 // daylight saving, so a constant offset is correct forever — no ICU/tz-db
 // lookup needed, and the arithmetic stays trivially testable.
@@ -119,4 +121,37 @@ export function calendarDayOfWeek(date: Date): number {
 export function bangkokToday(now: Date = new Date()): Date {
   const parts = toBangkokParts(now);
   return new Date(Date.UTC(parts.year, parts.month, parts.day));
+}
+
+/**
+ * The single source of truth for "day month year" display strings in the
+ * admin pages (e.g. "19 ส.ค. 2026") — always the Gregorian year, never พ.ศ.
+ * (see CLAUDE.md's architecture-decision note on why). Three separate admin
+ * pages each hand-rolled their own version of this before it was pulled out
+ * here; one of them used `Date.prototype.toLocaleDateString("th-TH", ...)`,
+ * which silently switches to the Buddhist calendar because that's `th-TH`'s
+ * ICU default — this function never delegates to `toLocaleDateString` for
+ * exactly that reason. Takes calendar parts (not a raw `Date`) so both a
+ * real timestamp (via toBangkokParts) and an already-parsed "YYYY-MM-DD"
+ * key (e.g. dashboard.service.ts's per-day trend, keyed as a string rather
+ * than a Date so it can double as a stable Map key) can share the same
+ * formatter — see formatThaiDate below for the common instant case.
+ */
+export function formatThaiDateParts(parts: { year: number; month: number; day: number }): string {
+  return `${parts.day} ${MONTH_SHORT_TH[parts.month]} ${parts.year}`;
+}
+
+/** formatThaiDateParts for a real instant (DateTime column) — Bangkok-aware via toBangkokParts. */
+export function formatThaiDate(instant: Date): string {
+  return formatThaiDateParts(toBangkokParts(instant));
+}
+
+/**
+ * "day month", no year — for contexts where every row is already known to
+ * be within the same year (e.g. the admin dashboard's 30-day trend), where
+ * repeating the year on every row would just be clutter, not the ค.ศ./พ.ศ.
+ * concern formatThaiDateParts exists for.
+ */
+export function formatThaiDayMonthParts(parts: { month: number; day: number }): string {
+  return `${parts.day} ${MONTH_SHORT_TH[parts.month]}`;
 }

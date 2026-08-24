@@ -20,3 +20,9 @@ export const setUserRoleSchema = z.object({
 });
 
 export type SetUserRoleInput = z.infer<typeof setUserRoleSchema>;
+
+export const deleteUserSchema = z.object({
+  userId: z.uuid(MESSAGES.auth.userIdInvalid),
+});
+
+export type DeleteUserInput = z.infer<typeof deleteUserSchema>;

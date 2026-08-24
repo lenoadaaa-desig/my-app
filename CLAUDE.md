@@ -79,6 +79,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 All `db:*` scripts (and `test`/`test:watch`) wrap the underlying CLI with `dotenv-cli` reading `.env.local` — never run `npx prisma` or `npx vitest` directly (see "ข้อจำกัดเวอร์ชัน" below). Running bare `vitest`/`npx vitest run` skips `.env.local` entirely and fails every DB-touching test with `DATABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY` missing — not a real regression, just a reminder that the env didn't load.
 
+`prisma migrate dev` รันไม่ได้ใน environment นี้ (CLI ตรวจว่า non-interactive
+แล้วปฏิเสธ ทั้งที่ลอง pipe input ให้ก็ตาม) ให้ใช้ `prisma migrate diff` สร้าง
+SQL แล้วเขียน migration folder เอง apply ด้วย `migrate deploy` (คำสั่งที่
+ออกแบบมาสำหรับ non-interactive โดยเฉพาะ ไม่ใช่ทางลัดที่ข้ามการตรวจสอบ)
+**ห้ามใช้ `db push` เพราะจะข้ามประวัติ migration** ตรวจด้วย `migrate status`
+ทุกครั้งหลัง apply ว่าขึ้น "Database schema is up to date" ไม่มี drift
+
 Test runner: Vitest (Next 16 แนะนำอย่างเป็นทางการ)
 รันด้วย npm test — เต็มชุดใช้เวลา ~2 นาที เพราะแตะ DB จริง
 ระหว่างแก้ตรรกะ booking ใช้ npm run test:fast แทน (เร็วกว่ามาก
@@ -119,6 +126,19 @@ Vitest รันไฟล์เทสแบบขนานเป็นค่า�
 ปนอยู่จริงในฐานข้อมูลจริง `scripts/clean-test-data.ts` (ด้านบน) มี guard นี้
 ตั้งแต่สร้าง ส่วน `seed-demo.ts` เพิ่มทีหลัง — เช็คทุกครั้งที่เพิ่มสคริปต์ใหม่
 ใน `scripts/`
+
+ข้อมูลชั่วคราวทุกชุดต้องใช้ marker ที่ `db:clean-test` จับได้ — category
+ขึ้นต้นด้วย `test:` (เช่น `test:restaurant`, `test:booking`) และอีเมลลงท้าย
+`.local` เท่านั้น ห้ามคิด marker ใหม่เอง (เช่น `explain:synthetic`) ต่อให้
+อีเมลลงท้าย `.local` ถูกแล้วก็ตาม เพราะ `db:clean-test` เช็ค category ด้วย
+`LIKE 'test%'` ตรง ๆ — marker ที่ไม่ขึ้นต้นแบบนี้จะหลุดรอดไปเสมอ ถ้าจำเป็น
+ต้องตั้ง marker ใหม่จริง ๆ (ไม่ใช่แค่ยืมของเดิม) ต้องอัปเดต
+`scripts/clean-test-data.ts` ให้จับ pattern ใหม่นั้นด้วยในคราวเดียวกัน
+เคยพลาดมาแล้ว 2 ครั้ง: `[test]`/`category: "test"` จาก Vitest fixture เดิม
+(ก่อนแยกเป็น marker ต่อไฟล์) และ `explain:synthetic` จากสคริปต์วัด
+ประสิทธิภาพก่อนตัดสินใจเรื่อง index (Task 8 phase 2) — ทั้งสองครั้งข้อมูล
+ทดสอบหลุดรอด `db:clean-test` ไปได้เพราะ pattern ไม่ตรง ไม่ใช่เพราะสคริปต์
+ทำงานผิด
 
 `server-only` ไม่มีอยู่จริงใน node_modules — Next.js alias ให้เองตอน
 build/dev เท่านั้น (ผ่าน "react-server" export condition) Vitest ไม่มี
@@ -394,17 +414,55 @@ Prisma CLI อ่าน `.env.local` ไม่ได้ ต้องเรีย
     log/DB query โชว์ ค.ศ. (2026) จะสับสนตอน debug ว่าตัวเลขไหนตรงกับแถวไหน
     หน้าจออื่นในแอป (booking date) ไม่เคยโชว์ปีเลยจึงไม่มีบรรทัดฐานให้ขัดแย้ง
 
+    **ใช้ `lib/datetime.ts`'s `formatThaiDate`/`formatThaiDateParts`/
+    `formatThaiDayMonthParts` เท่านั้นสำหรับวันที่แบบนี้ในหน้าแอดมิน — ห้าม
+    เขียน formatDate เองใหม่ในหน้าใดหน้าหนึ่งอีก** บั๊กนี้เกิดซ้ำ 2 ครั้งแล้ว:
+    ครั้งแรกที่ `/admin/restaurants` ใช้ `year + 543` ตรง ๆ (แก้แล้ว), ครั้งที่
+    สองที่ `admin-user-table.tsx` ใช้ `Date.prototype.toLocaleDateString(
+    "th-TH", ...)` ซึ่งเป็นคนละกลไกแต่ได้ผลลัพธ์เดียวกัน (พ.ศ.) เพราะ `th-TH`
+    locale ของ ICU ใช้ปฏิทินพุทธเป็นค่าเริ่มต้นเอง ไม่เกี่ยวกับเลข 543 เลย
+    grep หา `+543`/`+ 543` เพียงอย่างเดียวจึงจับบั๊กรูปแบบที่สองไม่ได้ ต้อง grep
+    `toLocaleDateString`/`toLocaleString`/`th-TH` ด้วยเสมอเวลาตรวจเรื่องนี้ซ้ำ
+
+16. **`authService.setUserRole`'s `actingAdminId` เป็น optional โดยตั้งใจ**
+    (Task 8 phase 2) ฟังก์ชันนี้ถูกเรียกจาก 2 บริบทที่ต่างกัน: (ก)
+    `app/admin/actions.ts` เวลาแอดมินเปลี่ยน role ผู้ใช้อื่นจากหน้า `/admin`
+    — ส่ง `actingAdminId` เสมอ เพื่อบังคับ 2 กฎ: ห้ามเปลี่ยน role ตัวเอง
+    (กันเผลอลดสิทธิ์ตัวเองจนเข้าระบบไม่ได้อีก) และห้ามลด role ของแอดมินคน
+    สุดท้ายที่เหลืออยู่ในระบบ (กันระบบไม่มีแอดมินเหลือเลย) (ข) เส้นทาง
+    auto-promote ภายในระบบ 3 จุด — `lib/dal.ts`'s `healOwnerRoleIfNeeded`,
+    `modules/restaurant/restaurant.service.ts`'s `createRestaurant`, และ
+    `scripts/seed-demo.ts` — ทั้งสามจุดนี้ไม่มี "แอดมินที่กำลังกระทำ" เลย
+    (promote customer เป็น owner เอง ไม่ใช่แอดมินสั่ง) เรียกโดยไม่ส่ง
+    `actingAdminId` ปลอดภัยเพราะ 2 กฎข้างต้นเทียบกับ `undefined` แล้วไม่มี
+    วันตรงเลย (self-check เทียบ userId กับ id ที่ไม่มีค่า, last-admin check
+    เช็คเฉพาะแถวที่เป็น ADMIN อยู่แล้วซึ่ง 3 จุดนี้ไม่เคยแตะ) ห้ามทำให้
+    parameter นี้ required เพราะจะพัง 3 จุดนั้นทันที (`npx tsc` จับได้จริง —
+    เจอตอนแก้ครั้งแรกที่ลืมจุดนี้)
+
+    ปุ่มลบ/เปลี่ยน role ตัวเองในหน้า `/admin` (`admin-user-table.tsx`,
+    `delete-user-dialog.tsx`) disable ไว้เป็น UX เสริมเท่านั้น (เหมือน
+    `disabled={isPending}` ของปุ่มอื่น ๆ) **การบังคับจริงอยู่ที่ service**
+    ยืนยันด้วยการเรียก `authService.deleteUser`/`setUserRole` ตรง ๆ (ข้าม UI
+    ทั้งหมด) ด้วย `userId === actingAdminId` แล้วเห็น error กลับมาจริง —
+    ไม่ใช่แค่เชื่อว่าปุ่มถูกซ่อนแล้วต้องปลอดภัย
+
+17. Profile.email มี @unique ตั้งแต่ 2026-08-23
+    เพราะเคยมี profile ซ้ำ email 2 แถว
+    ทำให้ query ด้วย email ได้ผลไม่แน่นอน
+    ถ้าเจอ error unique violation ตอนสมัคร
+    แปลว่ามี profile เก่าค้างอยู่ ต้องตรวจก่อนแก้ constraint
+
 ## ปัญหาค้างที่ยังไม่แก้
 
-_(ตรวจกับโค้ด/DB จริงล่าสุด 2026-08-18 — ของเดิมทั้ง 6 รายการแก้ไปแล้ว
-หรือย้ายไปหมวด "ข้อจำกัดที่ทราบแล้ว" ด้านล่าง รายการที่เหลืออยู่ตอนนี้
-เป็นข้อเท็จจริงใหม่ที่พบระหว่างตรวจรอบนี้)_
-
-- `authService.deleteUser` (`modules/auth/auth.service.ts`) ลบทั้ง `profiles`
-  (ผ่าน Prisma) และ `auth.users` (ผ่าน `adminClient.auth.admin.deleteUser`)
-  พร้อมกันแล้ว แต่ยังไม่มี route/action ไหนเรียกใช้จริง
-  (grep ทั้ง `app/` เจอแค่จุด import `auth.service` สองที่ ไม่มีจุดเรียก
-  `deleteUser`) — ต้องต่อเข้ากับหน้าแอดมิน (Task 8) ถ้าจะให้ลบ user ได้จริง
+_(ตรวจกับโค้ด/DB จริงล่าสุด 2026-08-23 — `authService.deleteUser` ที่เคย
+ค้างอยู่ในรายการนี้ต่อเข้ากับหน้าแอดมินแล้วใน Task 8 phase 2 (ดู
+`app/admin/actions.ts`'s `deleteUser`, เรียกจาก
+`app/admin/delete-user-dialog.tsx`) และ profile ที่เคยซ้ำ email
+`demo-customer@example.com` (`b131ee29-...`) ก็ลบไปแล้วผ่าน
+`authService.deleteUser` จริง (ยืนยันหายทั้ง `profiles`/`auth.users`) —
+ทั้งสองรายการลบออกจากลิสต์นี้ ตอนนี้ไม่มีรายการค้างจริงที่พบระหว่างตรวจ
+รอบนี้)_
 
 ทุกครั้งที่แก้ปัญหาในลิสต์นี้ ต้องลบรายการออกทันที
 เอกสารที่ผิดอันตรายกว่าไม่มีเอกสาร
@@ -414,9 +472,14 @@ _(ตรวจกับโค้ด/DB จริงล่าสุด 2026-08-18
 
 - `Profile` ไม่มี FK ไป `auth.users` — ตั้งใจแบบนี้ถาวร ไม่ใช่ของค้างที่จะมาแก้
   ทีหลัง เพราะ Project rules ข้อ 2 ห้าม Prisma แตะ schema `auth` ของ Supabase
-  เด็ดขาด ผลคือการลบ user ต้องลบสองที่แยกกันเสมอผ่านโค้ดแอป (ดูฟังก์ชัน
-  `deleteUser` ในหมวด "ปัญหาค้างที่ยังไม่แก้" ด้านบน) ไม่มีทางใช้
-  `ON DELETE CASCADE` ระดับ DB ได้
+  เด็ดขาด ผลคือการลบ user ต้องลบสองที่แยกกันเสมอผ่านโค้ดแอป (ดู
+  `authService.deleteUser`) ไม่มีทางใช้ `ON DELETE CASCADE` ระดับ DB ได้ —
+  ผลอีกอย่างคือ Supabase ยอมสร้าง auth user ใหม่ด้วย email ที่มี profile
+  แถวอยู่แล้วได้เฉย ๆ (ไม่มีอะไรเช็คข้ามกัน) `Profile.email` มี `@unique`
+  ตั้งแต่ 2026-08-23 แล้ว (ดู "การตัดสินใจสถาปัตยกรรม" ข้อ 17) ช่วยกัน
+  profile ซ้ำ email ได้ แต่ไม่ได้กันกรณี Supabase auth.users มี 2 คนคนละ id
+  ใช้ email เดียวกันในฝั่ง auth เอง (Supabase เองปกติกันเรื่องนี้อยู่แล้ว
+  ที่เจอมาเกิดเพราะ profile แถวหนึ่งไม่มี auth.users คู่กันตั้งแต่ต้น)
 - `updated_at` อัปเดตเฉพาะเมื่อแก้ผ่าน Prisma — `@updatedAt` ใน
   `prisma/schema.prisma` เป็นกลไกฝั่ง Prisma client (คำนวณค่าแล้วส่งเป็นส่วน
   หนึ่งของ UPDATE statement) ไม่ใช่ DB trigger ยืนยันแล้วว่า DB จริงไม่มี
@@ -485,6 +548,18 @@ key ภายใน (เช่น `"__all__"`, `"blurry_photo"`) แทนข้
 จุดที่ใช้ `Select` ทั้งโปรเจกต์ (grep `SelectValue` แล้ว) มี 3 จุด — อีกจุด
 คือตัวกรองสถานะใน `app/admin/restaurants/status-filter.tsx` ซึ่งมี mapping
 ถูกต้องอยู่แล้วตั้งแต่สร้าง
+
+decorative div ที่วางทับพื้นที่อื่น (absolute/fixed + ค่า top ติดลบ) ต้องมี
+`pointer-events-none` เสมอ — `-z-10` ไม่ช่วย ถ้า element ที่ถูกทับอยู่คนละ
+stacking context (เช่น `SiteHeader` ใน `layout.tsx` กับ hero ใน `page.tsx`)
+z-index เทียบกันได้แค่ภายใน stacking context เดียวกันเท่านั้น
+
+อาการ: ลิงก์ถูกทุกอย่างแต่กดไม่ได้ ไม่มี error ใด ๆ ให้เห็น
+วิธีตรวจ: `document.elementFromPoint()` ที่พิกัดลิงก์ ถ้าคืน element อื่นที่
+ไม่ใช่ `<a>` คือโดนทับ
+
+เคยเกิดจริงกับ hero section ใน `app/page.tsx` ที่ก็อปมาจาก Tailwind UI
+template — ตรวจทุกครั้งที่เอา decorative element จากที่อื่นมาใช้
 
 ## Target folder structure
 

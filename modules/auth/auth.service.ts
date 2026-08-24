@@ -131,7 +131,47 @@ export async function ensureProfile(user: User): Promise<void> {
   }
 }
 
-export async function setUserRole(userId: string, role: Role): Promise<ServiceResult<Profile>> {
+// actingAdminId is optional and only supplied by the admin panel's own
+// action (app/admin/actions.ts) — this function is also called from two
+// system-internal auto-promotion paths that have no "acting admin" at all
+// (lib/dal.ts's healOwnerRoleIfNeeded, restaurant.service.ts's
+// createRestaurant, and scripts/seed-demo.ts), always promoting a
+// customer/owner and never touching a row that's currently ADMIN. Leaving
+// it undefined there is safe: the self-change check below can never match
+// an undefined id, and the last-admin check only ever fires for a row
+// that's already ADMIN, which none of those call sites ever target.
+export async function setUserRole(
+  userId: string,
+  role: Role,
+  actingAdminId?: string
+): Promise<ServiceResult<Profile>> {
+  // An admin changing their own role could lock themselves out of /admin
+  // entirely with no other admin around to undo it — block unconditionally,
+  // not just by disabling the dropdown in the UI (see admin-user-table.tsx).
+  if (userId === actingAdminId) {
+    return {
+      success: false,
+      error: { code: ERROR_CODES.INVALID_STATE, message: MESSAGES.auth.cannotChangeOwnRole },
+    };
+  }
+
+  // Independent of the self-change check above: even when a *different*
+  // admin is doing the demoting, the system must never end up with zero
+  // admins. Only worth the extra query when actually demoting away from
+  // admin — promotions and lateral customer/owner changes can't trigger this.
+  if (role !== "admin") {
+    const target = await prisma.profile.findUnique({ where: { id: userId }, select: { role: true } });
+    if (target?.role === PrismaRole.ADMIN) {
+      const adminCount = await prisma.profile.count({ where: { role: PrismaRole.ADMIN } });
+      if (adminCount <= 1) {
+        return {
+          success: false,
+          error: { code: ERROR_CODES.INVALID_STATE, message: MESSAGES.auth.cannotDemoteLastAdmin },
+        };
+      }
+    }
+  }
+
   let profileRow;
   try {
     profileRow = await prisma.profile.update({
@@ -165,13 +205,38 @@ export async function setUserRole(userId: string, role: Role): Promise<ServiceRe
   return { success: true, data: toProfile(profileRow) };
 }
 
-export async function deleteUser(userId: string): Promise<ServiceResult<null>> {
+export async function deleteUser(userId: string, actingAdminId: string): Promise<ServiceResult<null>> {
+  if (userId === actingAdminId) {
+    return {
+      success: false,
+      error: { code: ERROR_CODES.INVALID_STATE, message: MESSAGES.auth.cannotDeleteSelf },
+    };
+  }
+
+  // Profile.ownedRestaurants / .bookings use onDelete: Restrict — checked
+  // up front (not just caught as a raw Prisma FK error after the fact) so
+  // the admin sees exactly what's blocking the delete and how much of it
+  // there is, instead of a generic failure message.
+  const [restaurantCount, bookingCount] = await Promise.all([
+    prisma.restaurant.count({ where: { ownerId: userId } }),
+    prisma.booking.count({ where: { customerId: userId } }),
+  ]);
+  if (restaurantCount > 0 || bookingCount > 0) {
+    return {
+      success: false,
+      error: {
+        code: ERROR_CODES.INVALID_STATE,
+        message: MESSAGES.auth.deleteUserBlocked(restaurantCount, bookingCount),
+      },
+    };
+  }
+
   try {
-    // Profile.ownedRestaurants / .bookings use onDelete: Restrict, so this
-    // throws (and we report failure) instead of deleting a user whose data
-    // would be left dangling.
     await prisma.profile.delete({ where: { id: userId } });
   } catch (err) {
+    // Falls back to a generic message — this branch is now only reachable
+    // by a genuine surprise (e.g. a row created between the counts above
+    // and this delete), not the expected "user has dependents" case.
     console.error("[auth] deleteUser: profile delete failed", err);
     return {
       success: false,

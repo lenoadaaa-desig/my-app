@@ -3,15 +3,12 @@ import { RestaurantStatus } from "@prisma/client";
 import { requireRole } from "@/lib/dal";
 import * as adminService from "@/modules/admin/admin.service";
 import { listRestaurantsQuerySchema, type ListRestaurantsQuery } from "@/modules/admin/admin.schema";
-import { calendarDaysBetween, toBangkokParts } from "@/lib/datetime";
-import { MESSAGES, MONTH_SHORT_TH } from "@/constants/messages";
+import { calendarDaysBetween, toBangkokParts, formatThaiDate } from "@/lib/datetime";
+import { MESSAGES } from "@/constants/messages";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
+import { buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { RestaurantStatusFilter } from "./status-filter";
-
-function formatDate(instant: Date): string {
-  const { year, month, day } = toBangkokParts(instant);
-  return `${day} ${MONTH_SHORT_TH[month]} ${year}`;
-}
 
 export default async function AdminRestaurantsPage({
   searchParams,
@@ -34,7 +31,17 @@ export default async function AdminRestaurantsPage({
 
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-4 bg-canvas px-4 py-6 sm:px-6">
-      <h1 className="font-heading text-2xl font-semibold text-ink">{MESSAGES.admin.queueTitle}</h1>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h1 className="font-heading text-2xl font-semibold text-ink">{MESSAGES.admin.queueTitle}</h1>
+        <div className="flex flex-wrap gap-2">
+          <Link href="/admin" className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
+            {MESSAGES.admin.manageUsersTitle}
+          </Link>
+          <Link href="/admin/dashboard" className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
+            {MESSAGES.admin.manageDashboardLink}
+          </Link>
+        </div>
+      </div>
 
       <div className="flex flex-col gap-1.5">
         <p className="text-sm font-medium text-ink">{MESSAGES.admin.statusFilterLabel}</p>
@@ -73,14 +80,14 @@ export default async function AdminRestaurantsPage({
                   <TableCell className="text-ink-soft">
                     {restaurant.owner.fullName ?? restaurant.owner.email ?? MESSAGES.owner.dashboardNoName}
                   </TableCell>
-                  <TableCell className="text-ink-soft">{formatDate(restaurant.createdAt)}</TableCell>
+                  <TableCell className="text-ink-soft">{formatThaiDate(restaurant.createdAt)}</TableCell>
                   <TableCell className="text-ink-soft">
                     {isPending
                       ? MESSAGES.admin.daysWaiting(
                           calendarDaysBetween(toBangkokParts(restaurant.createdAt), nowParts)
                         )
                       : restaurant.reviewedAt
-                        ? formatDate(restaurant.reviewedAt)
+                        ? formatThaiDate(restaurant.reviewedAt)
                         : MESSAGES.admin.reviewedAtEmpty}
                   </TableCell>
                 </TableRow>

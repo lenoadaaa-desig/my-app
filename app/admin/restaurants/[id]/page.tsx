@@ -5,16 +5,11 @@ import { requireRole } from "@/lib/dal";
 import * as restaurantService from "@/modules/restaurant/restaurant.service";
 import * as adminService from "@/modules/admin/admin.service";
 import { listRestaurantsQuerySchema } from "@/modules/admin/admin.schema";
-import { toBangkokParts } from "@/lib/datetime";
-import { MESSAGES, DAY_OF_WEEK_LABELS_TH, MONTH_SHORT_TH } from "@/constants/messages";
+import { formatThaiDate } from "@/lib/datetime";
+import { MESSAGES, DAY_OF_WEEK_LABELS_TH } from "@/constants/messages";
 import { RestaurantStatusBadge } from "@/components/restaurant-status-badge";
 import { ReviewChecklist } from "./review-checklist";
 import { RestaurantReviewActions } from "./review-actions";
-
-function formatDate(instant: Date): string {
-  const { year, month, day } = toBangkokParts(instant);
-  return `${day} ${MONTH_SHORT_TH[month]} ${year}`;
-}
 
 export default async function AdminRestaurantDetailPage({
   params,
@@ -108,7 +103,7 @@ export default async function AdminRestaurantDetailPage({
         </p>
         <p>
           <span className="font-medium text-ink">{MESSAGES.admin.columnSubmittedAt}: </span>
-          <span className="text-ink-soft">{formatDate(restaurant.createdAt)}</span>
+          <span className="text-ink-soft">{formatThaiDate(restaurant.createdAt)}</span>
         </p>
       </div>
 

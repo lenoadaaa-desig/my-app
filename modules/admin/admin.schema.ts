@@ -23,3 +23,14 @@ export const reviewRestaurantSchema = z
   });
 
 export type ReviewRestaurantInput = z.infer<typeof reviewRestaurantSchema>;
+
+export const USER_ROLE_QUERY_VALUES = ["customer", "owner", "admin"] as const;
+
+export const listUsersQuerySchema = z.object({
+  q: z.string().optional(),
+  role: z.enum(USER_ROLE_QUERY_VALUES).optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(50).default(20),
+});
+
+export type ListUsersQuery = z.infer<typeof listUsersQuerySchema>;

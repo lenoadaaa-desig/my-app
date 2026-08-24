@@ -41,7 +41,18 @@ export const MESSAGES = {
     roleUpdateFailed: "เปลี่ยนบทบาทผู้ใช้ไม่สำเร็จ",
 
     deleteUserSuccess: "ลบผู้ใช้สำเร็จ",
-    deleteUserFailed: "ลบผู้ใช้ไม่สำเร็จ กรุณาลบร้านหรือการจองที่เกี่ยวข้องก่อน",
+    deleteUserFailed: "ลบผู้ใช้ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง",
+    // Precise counts computed before attempting the delete (not parsed from
+    // a raw Prisma FK error) so the admin knows exactly what's blocking it.
+    deleteUserBlocked: (restaurantCount: number, bookingCount: number) => {
+      const parts: string[] = [];
+      if (restaurantCount > 0) parts.push(`เป็นเจ้าของร้าน ${restaurantCount} ร้าน`);
+      if (bookingCount > 0) parts.push(`มีการจอง ${bookingCount} รายการ`);
+      return `ลบผู้ใช้นี้ไม่ได้เพราะ${parts.join(" และ")} กรุณาย้ายหรือลบข้อมูลเหล่านี้ก่อน`;
+    },
+    cannotDeleteSelf: "แอดมินไม่สามารถลบบัญชีตัวเองได้",
+    cannotChangeOwnRole: "แอดมินไม่สามารถเปลี่ยนบทบาทตัวเองได้",
+    cannotDemoteLastAdmin: "ไม่สามารถลดบทบาทได้ เนื่องจากเป็นแอดมินคนเดียวที่เหลืออยู่ในระบบ",
 
     unauthorized: "กรุณาเข้าสู่ระบบก่อนใช้งาน",
     forbidden: "คุณไม่มีสิทธิ์เข้าถึงส่วนนี้",
@@ -296,6 +307,58 @@ export const MESSAGES = {
 
     manageRestaurantsLink: "จัดการร้านอาหาร",
     manageUsersTitle: "จัดการผู้ใช้",
+    manageDashboardLink: "สถิติภาพรวม",
+
+    // User management (/admin)
+    userSearchPlaceholder: "ค้นหาด้วยอีเมล ชื่อ หรือเบอร์โทร...",
+    userRoleFilterLabel: "กรองตามบทบาท",
+    userRoleFilterAll: "ทั้งหมด",
+    columnEmail: "อีเมล",
+    columnName: "ชื่อ",
+    columnPhone: "เบอร์โทร",
+    columnRole: "บทบาท",
+    columnCreatedAt: "วันที่สมัคร",
+    columnOwnedRestaurants: "จำนวนร้านที่เป็นเจ้าของ",
+    usersEmptyTitle: "ไม่พบผู้ใช้ที่ค้นหา",
+    usersEmptyHint: "ลองเปลี่ยนคำค้นหรือตัวกรองบทบาท",
+
+    deleteUserButton: "ลบผู้ใช้",
+    deleteUserDialogTitle: "ลบผู้ใช้นี้?",
+    deleteUserDialogDescription: (email: string) =>
+      `การลบย้อนกลับไม่ได้ พิมพ์อีเมล "${email}" ให้ตรงเพื่อยืนยัน`,
+    confirmEmailLabel: "พิมพ์อีเมลเพื่อยืนยัน",
+    confirmEmailMismatch: "อีเมลที่พิมพ์ไม่ตรงกับผู้ใช้ที่จะลบ",
+    deleteUserDialogCancel: "ยกเลิก",
+    deleteUserDialogConfirm: "ยืนยันลบผู้ใช้",
+    deleteUserActionPending: "กำลังลบ...",
+
+    roleChangeDisabledSelf: "เปลี่ยนบทบาทตัวเองไม่ได้",
+    roleChangeDisabledLastAdmin: "ลดบทบาทไม่ได้ เป็นแอดมินคนเดียวที่เหลืออยู่",
+
+    // Dashboard (/admin/dashboard)
+    dashboardOverviewTitle: "สถิติภาพรวม",
+    statPendingRestaurants: "ร้านรออนุมัติ",
+    statActiveRestaurants: "ร้านที่เปิดใช้งาน",
+    statBookingsToday: "การจองวันนี้",
+    statTotalUsers: "ผู้ใช้ทั้งหมด",
+
+    bookingTrendTitle: "การจอง 30 วันย้อนหลัง",
+    bookingTrendEmpty: "ยังไม่มีการจองในช่วง 30 วันที่ผ่านมา",
+    bookingTrendColumnDate: "วันที่",
+    bookingTrendColumnTotal: "รวม",
+    bookingTrendColumnBreakdown: "แยกตามสถานะ",
+
+    noShowTitle: "อัตรา no-show (30 วันย้อนหลัง)",
+    noShowOverallLabel: "ทั้งระบบ",
+    noShowNotEnoughData: "ยังมีข้อมูลไม่พอให้คำนวณอัตรา no-show",
+    noShowTopTitle: "ร้านที่ no-show สูงสุด",
+    noShowTopEmpty: "ยังไม่มีร้านไหนมีการจองครบเกณฑ์ขั้นต่ำ (10 รายการ) ใน 30 วันนี้",
+    noShowMinBookingsHint: (min: number) => `นับเฉพาะร้านที่มีการจองอย่างน้อย ${min} รายการ`,
+
+    topRestaurantsTitle: "ร้านที่มีการจองสูงสุด (30 วันย้อนหลัง)",
+    topRestaurantsEmpty: "ยังไม่มีการจองในช่วง 30 วันที่ผ่านมา",
+    columnBookingCount: "จำนวนการจอง",
+    columnNoShowRate: "อัตรา no-show",
 
     // Queue page (/admin/restaurants)
     queueTitle: "คิวอนุมัติร้าน",
