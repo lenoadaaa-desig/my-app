@@ -9,6 +9,22 @@ export const MESSAGES = {
     loginRequired: "เข้าสู่ระบบเพื่อจอง",
     retry: "ลองใหม่",
     today: "วันนี้",
+    backToHome: "กลับหน้าแรก",
+  },
+
+  notFoundPage: {
+    title: "ไม่พบหน้านี้",
+    description: "หน้าที่คุณกำลังหาอาจถูกย้ายหรือไม่มีอยู่จริง",
+  },
+
+  forbiddenPage: {
+    title: "ไม่มีสิทธิ์เข้าถึง",
+    description: "คุณไม่มีสิทธิ์เข้าถึงหน้านี้ ลองกลับไปหน้าแรกแล้วเข้าใช้งานส่วนที่คุณมีสิทธิ์แทน",
+  },
+
+  errorPage: {
+    title: "เกิดข้อผิดพลาด",
+    description: "ขออภัย เกิดข้อผิดพลาดที่ไม่คาดคิด ลองใหม่อีกครั้งหรือกลับหน้าแรก",
   },
 
   nav: {
@@ -123,6 +139,10 @@ export const MESSAGES = {
         ? `สถานะการจองปัจจุบันคือ "${current}" ไม่สามารถเปลี่ยนเป็นสถานะนี้ได้ (เปลี่ยนได้เฉพาะเป็น: ${allowed.join(", ")})`
         : `สถานะการจองปัจจุบันคือ "${current}" ไม่สามารถเปลี่ยนสถานะได้อีก`,
     statusUpdateFailed: "เปลี่ยนสถานะการจองไม่สำเร็จ กรุณาลองใหม่อีกครั้ง",
+    invalidQuery: "พารามิเตอร์การค้นหาไม่ถูกต้อง",
+    // minutesLeft is always >= 1 (checkBookingRateLimit in booking.service.ts
+    // rounds up) — never "0 นาที" or a negative number.
+    rateLimited: (minutesLeft: number) => `จองบ่อยเกินไป กรุณารออีก ${minutesLeft} นาทีแล้วลองใหม่`,
 
     // UI-facing (booking box + booking list) — not returned by any service.
     selectDateLabel: "เลือกวันที่",
@@ -533,4 +553,9 @@ export const ERROR_MESSAGES_TH: Record<ErrorCode, string> = {
   BOOKING_CODE_GENERATION_FAILED: "ไม่สามารถสร้างรหัสการจองได้ กรุณาลองใหม่อีกครั้ง",
   BOOKING_CREATE_FAILED: "จองไม่สำเร็จ กรุณาลองใหม่อีกครั้ง",
   BOOKING_STATUS_UPDATE_FAILED: "เปลี่ยนสถานะการจองไม่สำเร็จ กรุณาลองใหม่อีกครั้ง",
+  // Generic only — the real wait time is dynamic (MESSAGES.booking.rateLimited),
+  // so any call site that can show the server's own `message` should prefer
+  // that over this static fallback (see app/restaurants/[id]/booking-box.tsx's
+  // errorText).
+  RATE_LIMITED: "จองบ่อยเกินไป กรุณาลองใหม่ภายหลัง",
 };

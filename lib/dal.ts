@@ -1,7 +1,7 @@
 import "server-only";
 
 import { cache } from "react";
-import { redirect } from "next/navigation";
+import { redirect, forbidden } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
 import { ensureProfile, setUserRole } from "@/modules/auth/auth.service";
@@ -163,13 +163,18 @@ export async function requireAuth() {
   }
 }
 
-/** For Server Components / Server Actions: redirects instead of throwing. */
+/**
+ * For Server Components / Server Actions: redirects to /login if not
+ * authenticated at all; renders app/forbidden.tsx (a real 403, via
+ * next/navigation's forbidden() — requires experimental.authInterrupts,
+ * see next.config.ts) if authenticated but missing the required role.
+ */
 export async function requireRole(...roles: Role[]): Promise<Profile> {
   try {
     return await requireRoleOrThrow(...roles);
   } catch (err) {
     if (err instanceof ForbiddenError) {
-      redirect("/dashboard");
+      forbidden();
     }
     redirect("/login");
   }

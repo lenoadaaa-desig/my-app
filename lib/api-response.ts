@@ -17,6 +17,7 @@ export const ERROR_CODES = {
   BOOKING_CODE_GENERATION_FAILED: "BOOKING_CODE_GENERATION_FAILED",
   BOOKING_CREATE_FAILED: "BOOKING_CREATE_FAILED",
   BOOKING_STATUS_UPDATE_FAILED: "BOOKING_STATUS_UPDATE_FAILED",
+  RATE_LIMITED: "RATE_LIMITED",
 } as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[keyof typeof ERROR_CODES];
@@ -38,6 +39,7 @@ const STATUS_BY_CODE: Record<ErrorCode, number> = {
   BOOKING_CODE_GENERATION_FAILED: 500,
   BOOKING_CREATE_FAILED: 500,
   BOOKING_STATUS_UPDATE_FAILED: 500,
+  RATE_LIMITED: 429,
 };
 
 /** Maps a ServiceResult error code to the HTTP status a route should respond with. */

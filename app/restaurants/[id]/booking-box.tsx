@@ -43,6 +43,14 @@ const DATE_CHIP_COUNT = 14;
 const NOW_TICK_INTERVAL_MS = 30_000;
 
 function errorText(err: ApiError): string {
+  // RATE_LIMITED's real wait time is per-request (how many minutes until
+  // this customer's oldest recent booking ages out of the window — see
+  // checkBookingRateLimit in modules/booking/booking.service.ts) — a static
+  // ERROR_MESSAGES_TH string can't express that, so this is the one code
+  // that must show the server's own `message` instead of the generic map.
+  if (err.code === "RATE_LIMITED" && err.message) {
+    return err.message;
+  }
   return ERROR_MESSAGES_TH[err.code as keyof typeof ERROR_MESSAGES_TH] ?? MESSAGES.common.errorGeneric;
 }
 

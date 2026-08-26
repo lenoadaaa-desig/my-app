@@ -2,6 +2,7 @@ import type { NextRequest } from "next/server";
 import { requireProfileOrThrow, ForbiddenError, UnauthorizedError } from "@/lib/dal";
 import { ok, fail, ERROR_CODES } from "@/lib/api-response";
 import { MESSAGES } from "@/constants/messages";
+import { getMyBookingsQuerySchema } from "@/modules/booking/booking.schema";
 import * as bookingService from "@/modules/booking/booking.service";
 
 // Any logged-in profile — see app/api/bookings/route.ts's POST for why
@@ -11,13 +12,12 @@ export async function GET(request: NextRequest) {
   try {
     const profile = await requireProfileOrThrow();
 
-    const page = Number(request.nextUrl.searchParams.get("page") ?? "1");
-    const pageSize = Number(request.nextUrl.searchParams.get("pageSize") ?? "20");
+    const parsed = getMyBookingsQuerySchema.safeParse(Object.fromEntries(request.nextUrl.searchParams));
+    if (!parsed.success) {
+      return fail(ERROR_CODES.VALIDATION_ERROR, MESSAGES.booking.invalidQuery, 400);
+    }
 
-    const result = await bookingService.getMyBookings(profile.id, {
-      page: Number.isInteger(page) && page > 0 ? page : 1,
-      pageSize: Number.isInteger(pageSize) && pageSize > 0 && pageSize <= 50 ? pageSize : 20,
-    });
+    const result = await bookingService.getMyBookings(profile.id, parsed.data);
 
     return ok(result);
   } catch (err) {

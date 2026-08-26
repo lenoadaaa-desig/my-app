@@ -1,7 +1,7 @@
 import "server-only";
 
 import { randomInt } from "node:crypto";
-import { BookingStatus, RestaurantStatus, Prisma, type Booking } from "@prisma/client";
+import { BookingStatus, RestaurantStatus, Role as PrismaRole, Prisma, type Booking } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { ERROR_CODES, type ErrorCode } from "@/lib/api-response";
 import { MESSAGES } from "@/constants/messages";
@@ -178,6 +178,63 @@ function bookingLockKey(dateString: string, slotTime: string): string {
   return `${dateString}|${slotTime}`;
 }
 
+// Task 9 phase 1 — user-chosen threshold (not the 5/5 first proposed):
+// families/groups splitting one visit across several bookings in the same
+// few minutes (different party sizes over maxPartySize, Task 5) is real
+// usage, not abuse, so the window needed to be wide enough not to catch it.
+const BOOKING_RATE_LIMIT_WINDOW_MS = 10 * 60_000;
+const BOOKING_RATE_LIMIT_MAX = 10;
+
+type RateLimitCheck = { limited: false } | { limited: true; retryAfterMinutes: number };
+
+/**
+ * Counts this customer's own Booking rows created in the last
+ * BOOKING_RATE_LIMIT_WINDOW_MS — nothing else. A request that fails
+ * validation (SLOT_FULL, bad party size, etc.) throws BookingValidationError
+ * before tx.booking.create ever runs, so it never produces a row here and so
+ * never counts against the limit — exactly "count successful creates only",
+ * with no extra status filter needed, because a failed attempt simply never
+ * became a row at all.
+ *
+ * Admins are exempt (system-level grant, not a relationship — same
+ * reasoning as changeBookingStatus's isAdmin bypass in
+ * modules/booking/booking.service.ts, see CLAUDE.md item 4): an admin may
+ * need to create a booking on a customer's behalf and shouldn't be capped by
+ * their own admin account's booking history.
+ *
+ * A simple pre-check outside the advisory-locked transaction, not inside it
+ * — that lock is scoped per (restaurant, date, slotTime) to serialize seat
+ * accounting for one slot; this is a per-customer throttle across every
+ * restaurant/slot, an unrelated concern. Two requests from the same customer
+ * racing this check could in the worst case both pass at count 9, landing at
+ * 11 instead of exactly 10 — acceptable for anti-abuse throttling (unlike
+ * seat capacity, this isn't a hard invariant), and not worth a second lock.
+ */
+async function checkBookingRateLimit(customerId: string): Promise<RateLimitCheck> {
+  const actor = await prisma.profile.findUnique({ where: { id: customerId }, select: { role: true } });
+  if (actor?.role === PrismaRole.ADMIN) {
+    return { limited: false };
+  }
+
+  const windowStart = new Date(Date.now() - BOOKING_RATE_LIMIT_WINDOW_MS);
+  const recent = await prisma.booking.findMany({
+    where: { customerId, createdAt: { gte: windowStart } },
+    orderBy: { createdAt: "asc" },
+    take: BOOKING_RATE_LIMIT_MAX,
+    select: { createdAt: true },
+  });
+
+  if (recent.length < BOOKING_RATE_LIMIT_MAX) {
+    return { limited: false };
+  }
+
+  // The oldest of the current window's MAX bookings is the one that will
+  // next age out — that's the moment a new booking becomes allowed again.
+  const oldest = recent[0].createdAt;
+  const retryAfterMs = oldest.getTime() + BOOKING_RATE_LIMIT_WINDOW_MS - Date.now();
+  return { limited: true, retryAfterMinutes: Math.max(1, Math.ceil(retryAfterMs / 60_000)) };
+}
+
 export type CreateBookingInput = {
   restaurantId: string;
   date: string; // "YYYY-MM-DD"
@@ -200,6 +257,14 @@ export async function createBooking(
     return {
       success: false,
       error: { code: ERROR_CODES.VALIDATION_ERROR, message: MESSAGES.booking.invalidDateFormat },
+    };
+  }
+
+  const rateLimitCheck = await checkBookingRateLimit(customerId);
+  if (rateLimitCheck.limited) {
+    return {
+      success: false,
+      error: { code: ERROR_CODES.RATE_LIMITED, message: MESSAGES.booking.rateLimited(rateLimitCheck.retryAfterMinutes) },
     };
   }
 

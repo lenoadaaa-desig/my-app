@@ -146,6 +146,12 @@ model Booking {
 
   @@index([restaurantId, bookingDate, slotTime])
   @@index([customerId, bookingDate])
+  // Task 9 phase 1 — checkBookingRateLimit (booking.service.ts) runs this
+  // shape (WHERE customerId = ? AND createdAt >= ? ORDER BY createdAt LIMIT
+  // 10) on every createBooking call, the hot path — (customerId, bookingDate)
+  // above doesn't cover createdAt at all, so without this it'd fall back to
+  // a per-customer scan ordered on the wrong column.
+  @@index([customerId, createdAt])
   // Cross-restaurant aggregate filtered/grouped by date alone (the admin
   // dashboard's 30-day trend + no-show rate, Task 8 phase 2) — measured via
   // EXPLAIN (ANALYZE, BUFFERS) against 30,000 synthetic rows, not assumed.

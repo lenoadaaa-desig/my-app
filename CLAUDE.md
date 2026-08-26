@@ -453,6 +453,95 @@ Prisma CLI อ่าน `.env.local` ไม่ได้ ต้องเรีย
     ถ้าเจอ error unique violation ตอนสมัคร
     แปลว่ามี profile เก่าค้างอยู่ ต้องตรวจก่อนแก้ constraint
 
+18. **404/403 มีหน้าเฉพาะแล้ว (Task 9 เฟส 1)** ก่อนหน้านี้ URL ที่ไม่มีจริง
+    ขึ้นหน้า default ของ Next (ไม่มีธีม, ภาษาอังกฤษ) และ role mismatch ตอน
+    เข้าหน้าตรง ๆ (เช่น customer เข้า `/admin`) จะโดน `redirect("/dashboard")`
+    เงียบ ๆ ไม่มีคำอธิบายว่าทำไมถึงไม่เห็นหน้าที่ต้องการ — สองอย่างนี้แก้แล้ว:
+
+    `app/not-found.tsx` — หน้าธีมครีมทอง จับทั้ง URL ที่ไม่ match route ไหนเลย
+    และ `notFound()` ที่เรียกเองในหน้าไหนก็ตาม (เช่น `/admin/restaurants/[id]`)
+
+    `app/forbidden.tsx` + `next.config.ts`'s `experimental.authInterrupts: true`
+    — `lib/dal.ts`'s `requireRole` เปลี่ยนจาก `redirect("/dashboard")` เป็น
+    `forbidden()` (จาก `next/navigation`) เมื่อ role ไม่ตรง (ยังคง
+    `redirect("/login")` เหมือนเดิมถ้ายังไม่ login เลย) — ผลคือ role mismatch
+    ตอนนี้เห็นหน้า "ไม่มีสิทธิ์เข้าถึง" ชัดเจนแทนที่จะเด้งไป dashboard เงียบ ๆ
+    โดยไม่รู้สาเหตุ **`forbidden()` ยังเป็น experimental API ใน Next 16.3.0**
+    (ดู `node_modules/next/dist/docs/.../functions/forbidden.md`) ต้องเปิด
+    `experimental.authInterrupts` ถึงจะใช้ได้ — เปลี่ยนเฉพาะ `requireRole`
+    (ใช้ใน Server Component/page) เท่านั้น **ไม่แตะ `requireRoleOrThrow`**
+    (ใช้ใน API route, throw `ForbiddenError` แล้ว route จับเองส่ง JSON 403
+    ตามปกติ — ไม่เกี่ยวกับ `forbidden()` ของ Next เลย)
+
+    **next.config.ts เปลี่ยนแล้วต้อง restart dev server เอง** (ต่างจากไฟล์
+    หน้า/component ที่ hot-reload ได้) — ยืนยันจริงว่า `experimental.*` ไม่ขึ้น
+    จนกว่าจะ restart: ทดสอบ `/admin` ด้วย session customer หลังแก้โค้ดแล้ว
+    (ก่อน restart) ยังได้ทั้งเนื้อหา dashboard เก่าปนกับ UI หน้า forbidden
+    ใหม่มาในเรสปอนส์เดียว (สถานะยังเป็น 200 ไม่ใช่ 403) — คนละอาการกับตอน
+    restart แล้วซึ่งควรได้หน้า forbidden ล้วน ๆ กับสถานะ 403 จริง
+
+    **ความเสี่ยงของ `experimental.authInterrupts`** (ผู้ใช้ขอให้จดไว้):
+    `forbidden()`/`forbidden.js` ยังเป็น experimental ตั้งแต่ v15.1.0 จนถึง
+    16.3.0 ที่โปรเจกต์นี้ pin ไว้ (ข้าม major version หนึ่งรอบแล้วยังไม่
+    stabilize) — เอกสาร config เองก็ยังแท็ก `version: canary` ความเสี่ยงจริง
+    มี 2 อย่าง: (1) Next อาจเปลี่ยน API หรือชื่อ config flag ตอน stabilize
+    ในเวอร์ชันถัดไป, (2) ถ้าถูกถอดออกไปเลยโดยไม่มี API แทน — แต่กรณีนี้ build
+    จะ**พังทันทีตอน compile** (`forbidden` import ไม่มีอยู่จริงใน
+    `next/navigation`) ไม่ใช่ silent behavior regression ที่หลุดไป production
+    โดยไม่มีใครรู้ตัว จึงเป็นความเสี่ยงที่เห็นได้ทันทีตอน upgrade ไม่ใช่บั๊กแฝง
+
+    **วิธีถอยกลับถ้าจำเป็น** (2 จุด ไม่มี migration/data เกี่ยวข้องเลย):
+    1. `lib/dal.ts`'s `requireRole` — เปลี่ยน `forbidden()` กลับเป็น
+       `redirect("/dashboard")` ในบรานช์ `ForbiddenError`
+    2. ลบ `experimental.authInterrupts` ออกจาก `next.config.ts`
+    `app/forbidden.tsx` ทิ้งไว้เฉยๆ ได้ ไม่มีอะไรเรียกมันอีกถ้าทำ 2 ข้อบนแล้ว
+    ไม่ต้อง restart dev server ก่อนถอย — ไฟล์ page/component ปกติ hot-reload
+    ได้ (ต่างจากตอนเปิดใช้ที่ next.config.ts ต้อง restart)
+
+    ข้อควรระวังเชิงโค้ด: `requireRole` ต้องถูกเรียก**ก่อน** await ตัวแรกที่
+    เริ่ม streaming เสมอ (ปัจจุบันทุกหน้าเรียกเป็นบรรทัดแรกของ Server
+    Component อยู่แล้ว) — ถ้ามีหน้าไหนในอนาคตเรียก `requireRole` หลังจากเริ่ม
+    stream ไปแล้ว (เช่น อยู่ใน component ที่ห่อด้วย `<Suspense>` ของหน้านั้น)
+    `forbidden()` จะยังโชว์ UI ถูกต้อง แต่ HTTP status จะค้างเป็น 200 ไม่ใช่
+    403 จริง (เอกสาร Next เองระบุ trade-off นี้ไว้ตรงๆ)
+
+19. **Rate limiting ที่ `POST /api/bookings` (Task 9 เฟส 1)** — จำกัดที่ 10
+    booking / 10 นาที ต่อ `customerId` (ผู้ใช้เลือกเองจากตัวเลือกที่เสนอ 3
+    แบบ — Postgres counter ชนะเพราะไม่เพิ่ม dependency และทำในสไตล์เดียวกับ
+    advisory lock ที่มีอยู่แล้วได้) ดู `checkBookingRateLimit` ใน
+    `modules/booking/booking.service.ts` (เรียกจาก `createBooking` ก่อนเข้า
+    retry loop เดิม ไม่ใช่ใน transaction เดียวกับ advisory lock — เป็นคนละ
+    concern กัน เช็คแค่ customer เดียวข้ามร้าน/ข้าม slot ทั้งหมด)
+
+    **นับเฉพาะ booking ที่สร้างสำเร็จจริง** ไม่ต้อง filter status เพิ่มเลย —
+    เพราะ attempt ที่ fail (SLOT_FULL, party size เกิน, ฯลฯ) throw
+    `BookingValidationError` ก่อนถึง `tx.booking.create` เสมอ จึงไม่มีแถวเกิด
+    ขึ้นเลยตั้งแต่ต้น นับ `Booking` ที่มีอยู่จริงในหน้าต่างเวลา = นับเฉพาะที่
+    สร้างสำเร็จโดยอัตโนมัติ — ไม่ต้องมี status filter แยก (พิสูจน์ด้วยเทส "does
+    not count a failed booking attempt")
+
+    **แอดมินไม่ติด limit** (เผื่อต้องจองแทนลูกค้า) — เช็ค role ของ customerId
+    ที่กำลังจะจอง ณ ขณะนั้นตรงๆ ผ่าน `prisma.profile.findUnique` (query เพิ่ม
+    1 ครั้งต่อการจอง แลกกับไม่ต้องเปลี่ยน signature ของ `createBooking` ทั้ง
+    โปรเจกต์ ซึ่งจะกระทบทุก call site รวมถึงเทสเก่าจำนวนมาก)
+
+    เพิ่ม index `Booking(customerId, createdAt)` (migration
+    `20260825213041_add_booking_customer_created_at_index`) — query รูปแบบ
+    `WHERE customerId = ? AND createdAt >= ? ORDER BY createdAt LIMIT 10` รัน
+    ทุกครั้งที่มีคนจอง (hot path) และ index `(customerId, bookingDate)` เดิม
+    ไม่ครอบ `createdAt` เลย
+
+    Error code ใหม่ `RATE_LIMITED` (429) — message มีเวลาที่ต้องรอจริงเป็น
+    นาที (ปัดขึ้นเสมอ อย่างน้อย 1 นาที) **เป็นค่าไดนามิกต่อ request** ทำให้
+    `ERROR_MESSAGES_TH` (static map) ใช้ไม่ได้ — `app/restaurants/[id]/
+    booking-box.tsx`'s `errorText()` ต้อง special-case โชว์ `err.message`
+    ตรงๆ สำหรับโค้ดนี้โค้ดเดียว (ที่อื่นในโปรเจกต์ยังใช้ static map ตามเดิม
+    ไม่ได้แก้ทั่วโปรเจกต์)
+
+    เกณฑ์ 10/10 นาที (ไม่ใช่ 5/5 ที่เสนอตอนแรก) — ผู้ใช้ปรับเพราะครอบครัว/
+    กลุ่มที่แยกจองหลายโต๊ะในรอบใกล้กันเป็นการใช้งานจริง ไม่ใช่การโจมตี (ตรงกับ
+    "ข้อจำกัดที่ทราบแล้ว" ด้านล่างเรื่องไม่กันจองซ้ำของ customer เดียวกัน)
+
 ## ปัญหาค้างที่ยังไม่แก้
 
 _(ตรวจกับโค้ด/DB จริงล่าสุด 2026-08-23 — `authService.deleteUser` ที่เคย
@@ -480,6 +569,29 @@ _(ตรวจกับโค้ด/DB จริงล่าสุด 2026-08-23
   profile ซ้ำ email ได้ แต่ไม่ได้กันกรณี Supabase auth.users มี 2 คนคนละ id
   ใช้ email เดียวกันในฝั่ง auth เอง (Supabase เองปกติกันเรื่องนี้อยู่แล้ว
   ที่เจอมาเกิดเพราะ profile แถวหนึ่งไม่มี auth.users คู่กันตั้งแต่ต้น)
+
+  **ต้นตอที่พบจริง (Task 9 เฟส 1) ของ auth user ที่ไม่มี profile คู่กัน**:
+  `supabase.auth.admin.generateLink({ type: "magiclink", email })` — ถ้า
+  `email` นั้นยังไม่มี auth user อยู่เลย **Supabase จะสร้าง auth user ใหม่
+  ทันทีตอนเรียก generateLink เอง** (ไม่ใช่ตอนกดลิงก์) โดยเปลี่ยน response
+  เป็น `type: "signup"` แทน `"magiclink"` เงียบๆ ไม่ error ยืนยันจริงด้วย
+  `listUsers()` ก่อน/หลังเรียก — เจอ auth.users row ใหม่ id คนละตัว ไม่มี
+  Profile คู่กันเลย ทั้งที่ไม่เคยกดลิงก์หรือเรียก `verifyOtp` เลยสักครั้ง
+  นี่คือกลไกการทดสอบด้วย session จริง (magic-link) ที่ใช้ตลอดโปรเจกต์นี้ —
+  **น่าจะเป็นต้นตอของ profile ซ้ำ email `demo-customer@example.com` ที่เจอ
+  และแก้ไปตอน Task 8** (ดู "ปัญหาค้างที่ยังไม่แก้" ด้านบน) แม้จะพิสูจน์
+  ย้อนหลังไม่ได้ 100% แต่กลไกตรงกันเป๊ะ: เรียก `generateLink` ด้วยอีเมลที่คิด
+  ว่ามี user อยู่แล้วแต่จริงๆ ไม่มี (หรือมีแต่คนละ id) → ได้ auth user ใหม่
+  แบบไม่รู้ตัว → ล็อกอินครั้งแรกด้วย auth user ใหม่นี้ → `ensureProfile`
+  (`modules/auth/auth.service.ts`) สร้าง Profile ใหม่ให้ทันที (role
+  CUSTOMER เสมอ) → มี Profile 2 แถวคนละ id ใช้ email เดียวกัน (ก่อนที่
+  `Profile.email` จะมี `@unique`)
+
+  **กฎ**: ห้ามเรียก `generateLink` ด้วยอีเมลที่ไม่รู้แน่ชัดว่ามี auth user
+  จริงอยู่แล้ว — ถ้าจะสร้าง session ทดสอบสำหรับอีเมลใหม่ ต้องเรียก
+  `adminClient.auth.admin.createUser({ email, email_confirm: true })` เพื่อ
+  สร้าง auth user (และ `prisma.profile.create` คู่กันทันที ให้ id ตรงกัน)
+  ก่อนเสมอ แล้วค่อยเรียก `generateLink`/`verifyOtp` ทีหลัง
 - `updated_at` อัปเดตเฉพาะเมื่อแก้ผ่าน Prisma — `@updatedAt` ใน
   `prisma/schema.prisma` เป็นกลไกฝั่ง Prisma client (คำนวณค่าแล้วส่งเป็นส่วน
   หนึ่งของ UPDATE statement) ไม่ใช่ DB trigger ยืนยันแล้วว่า DB จริงไม่มี

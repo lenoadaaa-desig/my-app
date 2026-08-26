@@ -377,6 +377,144 @@ describe("createBooking: real concurrency", () => {
   );
 });
 
+describe("createBooking: rate limiting (Task 9 phase 1)", () => {
+  // Mirrors BOOKING_RATE_LIMIT_MAX / BOOKING_RATE_LIMIT_WINDOW_MS in
+  // booking.service.ts (not exported — these are the user-facing numbers
+  // the feature was specified with, asserted directly rather than imported).
+  const RATE_LIMIT_MAX = 10;
+  const RATE_LIMIT_WINDOW_MINUTES = 10;
+
+  it(
+    "allows RATE_LIMIT_MAX bookings in the window, then blocks the next one with RATE_LIMITED and a wait-time message",
+    async () => {
+      // Two restaurants: seedRestaurant only holds the throwaway rows that
+      // fill the window; targetRestaurant is what the real createBooking call
+      // under test targets — kept separate so this test can't be confused
+      // with a capacity/SLOT_FULL failure at a shared slot.
+      const seedRestaurant = await createTestRestaurant();
+      const targetRestaurant = await createTestRestaurant();
+      const customerId = await createTestCustomer();
+
+      // Seeded directly (bypassing createBooking, same as
+      // changeBookingStatus's fixtures above) — this test only exercises the
+      // rate-limit check itself, not slot/capacity logic. Parallel, not a
+      // sequential loop, purely to keep this test's own DB round-trip time
+      // down (each is an independent insert, no shared state between them).
+      await Promise.all(
+        Array.from({ length: RATE_LIMIT_MAX }, () =>
+          createTestBooking(seedRestaurant.id, customerId, { status: BookingStatus.CONFIRMED })
+        )
+      );
+
+      const result = await createBooking(customerId, {
+        restaurantId: targetRestaurant.id,
+        date: futureDateString(2),
+        slotTime: "12:00",
+        partySize: 2,
+      });
+
+      expect(result.success).toBe(false);
+      if (result.success) return;
+      expect(result.error.code).toBe("RATE_LIMITED");
+      expect(result.error.message).toContain(`${RATE_LIMIT_WINDOW_MINUTES} นาที`);
+    },
+    20_000
+  );
+
+  it(
+    "does not count a failed booking attempt (e.g. SLOT_FULL) against the limit",
+    async () => {
+      const targetRestaurant = await createTestRestaurant({ capacityPerSlot: 2, maxPartySize: 2 });
+      const customerId = await createTestCustomer();
+      const date = futureDateString(2);
+
+      // Fill the 2-seat slot with someone else first, so this customer's own
+      // attempts at it fail with SLOT_FULL — a BookingValidationError thrown
+      // before tx.booking.create ever runs, so none of these should leave a
+      // row behind or count toward this customer's own rate limit.
+      const otherCustomerId = await createTestCustomer();
+      await createBooking(otherCustomerId, { restaurantId: targetRestaurant.id, date, slotTime: "12:00", partySize: 2 });
+
+      for (let i = 0; i < RATE_LIMIT_MAX + 5; i++) {
+        const attempt = await createBooking(customerId, {
+          restaurantId: targetRestaurant.id,
+          date,
+          slotTime: "12:00",
+          partySize: 2,
+        });
+        expect(attempt.success).toBe(false);
+        if (attempt.success) return;
+        // Must fail on capacity, never on the rate limit itself — proves the
+        // repeated failures above never counted as bookings.
+        expect(attempt.error.code).toBe("SLOT_FULL");
+      }
+    },
+    30_000
+  );
+
+  it(
+    "allows booking again once the oldest of the window's bookings has aged out",
+    async () => {
+      const seedRestaurant = await createTestRestaurant();
+      const targetRestaurant = await createTestRestaurant();
+      const customerId = await createTestCustomer();
+
+      const seeded = await Promise.all(
+        Array.from({ length: RATE_LIMIT_MAX }, () =>
+          createTestBooking(seedRestaurant.id, customerId, { status: BookingStatus.CONFIRMED })
+        )
+      );
+
+      // Simulates "10 minutes have passed" by backdating createdAt directly on
+      // the already-created rows — createBooking has no injectable `now`
+      // (unlike the pure slot.engine.ts), so this manipulates real DB state
+      // instead of mocking a clock, the same approach this file already uses
+      // for other time-dependent behavior (see the minLeadHours tests above,
+      // which position the *slot* in time instead — this is the equivalent
+      // move for a check keyed on createdAt).
+      await prisma.booking.updateMany({
+        where: { id: { in: seeded.map((b) => b.id) } },
+        data: { createdAt: new Date(Date.now() - (RATE_LIMIT_WINDOW_MINUTES + 1) * 60_000) },
+      });
+
+      const result = await createBooking(customerId, {
+        restaurantId: targetRestaurant.id,
+        date: futureDateString(2),
+        slotTime: "12:00",
+        partySize: 2,
+      });
+
+      expect(result.success).toBe(true);
+    },
+    20_000
+  );
+
+  it(
+    "does not rate-limit an admin actor",
+    async () => {
+      const seedRestaurant = await createTestRestaurant();
+      const targetRestaurant = await createTestRestaurant();
+      const adminId = await createTestAdmin();
+
+      await Promise.all(
+        Array.from({ length: RATE_LIMIT_MAX }, () =>
+          createTestBooking(seedRestaurant.id, adminId, { status: BookingStatus.CONFIRMED })
+        )
+      );
+
+      const result = await createBooking(adminId, {
+        restaurantId: targetRestaurant.id,
+        date: futureDateString(2),
+        slotTime: "12:00",
+        partySize: 2,
+      });
+
+      expect(result.success).toBe(true);
+    },
+    20_000
+  );
+});
+
 describe("changeBookingStatus: transition matrix", () => {
   it(
     "enforces ALLOWED_BOOKING_TRANSITIONS exactly, for every (source, target) pair, via a real admin actor",

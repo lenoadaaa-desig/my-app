@@ -50,3 +50,18 @@ export const listRestaurantBookingsQuerySchema = z.object({
 });
 
 export type ListRestaurantBookingsQuery = z.infer<typeof listRestaurantBookingsQuerySchema>;
+
+// Task 9 phase 1 — replaces GET /api/bookings/my's previous hand-rolled
+// Number()-parsing (the one query schema in the project that wasn't zod).
+// Same bounds the manual version enforced (page > 0, 1-50 pageSize,
+// default 20) and the same shape as listPublicRestaurantsSchema — but
+// note the behavior difference from that manual version: an invalid value
+// here (e.g. `?page=abc`) now fails validation (400 VALIDATION_ERROR) same
+// as every other query schema in the project, rather than silently
+// falling back to the default like the old manual check did.
+export const getMyBookingsQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(50).default(20),
+});
+
+export type GetMyBookingsQuery = z.infer<typeof getMyBookingsQuerySchema>;
