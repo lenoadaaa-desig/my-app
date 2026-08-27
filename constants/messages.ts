@@ -27,6 +27,16 @@ export const MESSAGES = {
     description: "ขออภัย เกิดข้อผิดพลาดที่ไม่คาดคิด ลองใหม่อีกครั้งหรือกลับหน้าแรก",
   },
 
+  // <title>/<meta description> text only (Task 9 phase 2) — not rendered
+  // in the page body. Pages whose body already has a suitable heading
+  // string (nav.*, owner.*Title, admin.*Title) reuse that instead of
+  // duplicating a near-identical string here.
+  metadata: {
+    restaurantsListDescription:
+      "ค้นหาร้านอาหาร ดูเวลาว่าง และจองโต๊ะได้ทันทีจากร้านที่เปิดให้บริการบน TableNow",
+    adminRestaurantDetailTitle: "ตรวจสอบร้าน",
+  },
+
   nav: {
     searchRestaurants: "ค้นหาร้าน",
     myBookings: "การจองของฉัน",
@@ -244,6 +254,13 @@ export const MESSAGES = {
     savePending: "กำลังบันทึก...",
     saveSuccess: "บันทึกสำเร็จ",
     closedToggleLabel: "ปิดวันนี้",
+    // aria-label only (Task 9 phase 2 accessibility audit) — the visible day
+    // name (DAY_OF_WEEK_LABELS_TH) next to each time input isn't
+    // programmatically bound to it (a <p>, not a <label>), so a screen
+    // reader tabbing between the open/close inputs on a given row can't
+    // otherwise tell which day or which boundary it's on.
+    hoursOpenTimeLabel: (day: string) => `เวลาเปิด ${day}`,
+    hoursCloseTimeLabel: (day: string) => `เวลาปิด ${day}`,
     slotDurationLabel: "ความยาวรอบ (นาที)",
     capacityPerSlotLabel: "จำนวนที่นั่งต่อรอบ",
     maxPartySizeLabel: "จำนวนคนสูงสุดต่อการจอง",
@@ -438,6 +455,7 @@ export const MESSAGES = {
     rejectReasonDuplicate: "ร้านซ้ำ",
     rejectReasonNotARestaurant: "ไม่ใช่ร้านอาหาร",
     rejectReasonOther: "อื่น ๆ",
+    rejectReasonOtherLabel: "ระบุเหตุผล",
     rejectReasonOtherPlaceholder: "ระบุเหตุผล...",
     rejectDialogCancel: "ยกเลิก",
     rejectDialogConfirm: "ยืนยันปฏิเสธ",

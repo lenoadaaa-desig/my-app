@@ -20,43 +20,28 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   ถ้าเจออาการข้อมูลหน้าเว็บไม่ตรงกับ DB ให้สงสัยเรื่องนี้ก่อน
   ลอง `rm -rf .next/dev` แล้วสตาร์ท dev ใหม่
 
-## สถานะงานปัจจุบัน (อัปเดต 16 ส.ค. 2026)
+## สถานะงานปัจจุบัน (อัปเดต 27 ส.ค. 2026)
 
 เสร็จแล้ว:
-- Task 0-5: backend ครบทั้งระบบ 123 เทสผ่าน
-  schema + RLS + auth 3 บทบาท + ร้าน/อนุมัติ
-  + slot engine + createBooking (advisory lock)
-  + changeBookingStatus (relationship-based permission)
-- Task 6: ธีมครีมทอง + หน้าลูกค้า
-  /restaurants, /restaurants/[id], /bookings/my,
-  /dashboard, navigation ตาม role
-
-ยืนยันด้วยการทดสอบจริงในเบราว์เซอร์แล้ว:
-- จองสำเร็จได้รหัส BK-KDUCPB
-- ที่นั่งลดจาก 10 เหลือ 7 หลังจอง 3 คน (bookedMap ทำงานถูก)
-- responsive 375px ไม่แตก
-- isOpenNow จัดการร้านข้ามเที่ยงคืนถูกต้อง
-
-แก้ไปแล้วในรอบล่าสุด:
-- __all__ หลุดใน dropdown (Base UI Select.Value
-  ไม่ auto-derive label เหมือน Radix ต้องส่ง function)
-- placeholder รูปร้าน (ไอคอน UtensilsCrossed)
-- console 404 (มาจาก Link prefetch ไป /owner/dashboard
-  ที่ยังไม่มี แก้ด้วย prefetch={false} ชั่วคราว)
-- line-height ภาษาไทยกับ line-clamp (เพิ่ม leading-relaxed)
-
-กำลังทำ:
-- Task 7 หน้าเจ้าของร้าน (ยังไม่เริ่ม)
-
-ถัดไป:
-- Task 7 หน้าเจ้าของร้าน (ฟอร์มลงทะเบียน, ตั้งเวลาทำการ,
+- Task 0-6: backend ครบทั้งระบบ (schema + RLS + auth 3 บทบาท + ร้าน/อนุมัติ
+  + slot engine + createBooking (advisory lock) + changeBookingStatus
+  (relationship-based permission)) + ธีมครีมทอง + หน้าลูกค้า (/restaurants,
+  /restaurants/[id], /bookings/my, /dashboard)
+- Task 7: หน้าเจ้าของร้าน (ลงทะเบียน, สถานะอนุมัติ, ตั้งเวลาทำการ/ค่าการจอง,
   แดชบอร์ดจัดการการจองรายวัน)
-- Task 8 หน้าแอดมิน
-- Task 9 เก็บงาน
+- Task 8: หน้าแอดมิน (อนุมัติ/ปฏิเสธ/ระงับร้าน, จัดการ role/ลบผู้ใช้,
+  สถิติภาพรวม)
+- Task 9 เฟส 1: security audit ทั้งระบบ (ไม่พบช่องโหว่), rate limiting การจอง
+  (10 ครั้ง/10 นาทีต่อ customer, แอดมินยกเว้น), หน้า 404/403 ธีมเดียวกับแอป
+  (`forbidden()` + `authInterrupts`), `app/error.tsx` ด้วย `retry` prop,
+  `loading.tsx` 3 จุด, แก้ `scripts/clean-test-data.ts` ให้กวาดทั้ง
+  `profiles` และ `auth.users` คู่กัน (รวมถึง orphan auth user — ดู
+  "ข้อจำกัดที่ทราบแล้ว" เรื่อง `generateLink`)
+- Task 9 เฟส 2 (งานสุดท้าย, ทำอยู่): README.md/docs/api.md เขียนใหม่,
+  metadata/SEO ครบทุกหน้า, accessibility audit (alt/aria-label/label ผูก
+  input) — ดูรายละเอียดที่กระจายอยู่ในไฟล์นี้ตามหัวข้อที่เกี่ยวข้อง
 
-ปัญหาค้าง:
-- ลิงก์ /owner/dashboard ใน site-nav ใส่ prefetch={false} ไว้
-  เมื่อ Task 7 สร้างหน้าจริงแล้วให้เอาออก
+เทสเต็มชุด (`npm test`) ผ่าน 146/146 ล่าสุด (27 ส.ค. 2026)
 
 ข้อมูลทดสอบ:
 - npm run seed:demo สร้างร้าน 3 ร้าน
@@ -72,7 +57,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `npm run db:generate` — regenerate the Prisma client
 - `npm run db:migrate -- --name <name>` — create + apply a dev migration (never use `prisma db push` — no migration file to track)
 - `npm run db:pull` — introspect the live DB (e.g. `-- --print` to compare without overwriting `schema.prisma`)
-- `npm run db:studio` / `npm run db:seed`
+- `npm run db:studio`
+- `npm run db:seed` เอาออกแล้ว (Task 9 เฟส 2) — ไม่เคยมี `prisma.seed` config ผูกไว้เลยตั้งแต่สร้าง เรียกแล้ว error ทันที ใช้ `npm run seed:demo` แทน (เป็นสคริปต์เดียวที่ทำหน้าที่ seed จริงในโปรเจกต์นี้)
 - `npm test` — run the full test suite once (Vitest, wrapped with `dotenv-cli` reading `.env.local` — most test files hit the live DB directly, so this must load first)
 - `npm run test:watch` — Vitest in watch mode
 - `npm run test:fast` — only `slot.engine.test.ts` + `booking.state.test.ts` (pure-function tests, no DB) — use while iterating on booking-logic changes; still run the full `npm test` before committing, since it's the only one that actually exercises the DB-backed tests (advisory lock, concurrency, RLS-adjacent paths)
@@ -612,22 +598,22 @@ TableNow — an online restaurant table-booking / queue system. Next.js App Rout
 - `app/globals.css` — Tailwind CSS v4 (via `@tailwindcss/postcss`, no `tailwind.config.*` — v4 is configured through CSS).
 - Path alias `@/*` maps to the repo root (`tsconfig.json`).
 
-**Target architecture** (see "Project rules" below) moves app data access from direct Supabase table calls onto Prisma + a `modules/` service layer, and expands the role model from two roles to three (`CUSTOMER`, `OWNER`, `ADMIN`). The database side of this is done — Prisma owns the schema (see "Database" below) and the DB enum already has all three roles — but the application code hasn't caught up: `modules/` is still empty, `lib/dal.ts` still uses the old 2-role type and reads `profiles` via the Supabase client rather than Prisma. Treat the rest of this section as the current implementation, and the rules section as the direction new work should take it.
+The "Project rules" architecture below (Prisma + `modules/` service layer, 3-role model) is fully in place as of Task 9 phase 2 — this used to be a "target, not yet built" note during Task 2-3; it's been the actual current architecture since the role model migrated to `CUSTOMER`/`OWNER`/`ADMIN`. `modules/` holds `auth/`, `restaurant/`, `booking/`, and `admin/` service subtrees; `lib/dal.ts` uses the 3-role `Role` type and reads `profiles` via Prisma-adjacent Supabase calls plus Prisma directly (see its own section below).
 
 ### Auth (Supabase SSR via `@supabase/ssr`)
 
 - `lib/supabase/client.ts` / `lib/supabase/server.ts` — browser vs. server Supabase clients; the server client reads/writes auth cookies via `next/headers`.
 - `proxy.ts` (root) + `lib/supabase/proxy.ts` — Next 16 renamed `middleware.ts` to `proxy.ts` (`node_modules/next/dist/docs/.../file-conventions/proxy.md`). `updateSession()` refreshes the session on every request and redirects unauthenticated users away from `/dashboard` and `/admin`, and authenticated users away from `/login`/`/signup`. It only checks *authentication*, not role — update `PROTECTED_PREFIXES`/`AUTH_PATHS` here when adding new gated routes.
-- `lib/dal.ts` — data-access layer; `getUser()` (cached, nullable) and `getProfile()` (cached, redirects to `/login` if no profile row) are the entry points for the current user and their role. Prefer these over calling Supabase directly for user/role lookups. **Currently `Role = "user" | "admin"`** — the project rules below call for `CUSTOMER | OWNER | ADMIN`; migrating this type and the `profiles.role` values is pending work, not yet done.
-- Server actions: `app/actions.ts` (`logout`), `app/login/actions.ts` (`login`), `app/signup/actions.ts` (`signup`), `app/admin/actions.ts` (`setUserRole`). `setUserRole` re-checks `getProfile().role === "admin"` itself — role authorization for admin mutations happens at the action, not the proxy.
+- `lib/dal.ts` — data-access layer, `Role = "customer" | "owner" | "admin"`. `getUser()`/`getProfileOrNull()`/`requireProfileOrThrow()` (all `cache()`-wrapped) are the entry points for the current user and their role; `requireRoleOrThrow(...roles)` throws for API routes, `requireRole(...roles)` redirects/`forbidden()`s for Server Components/pages (see "การตัดสินใจสถาปัตยกรรม" item 18). Prefer these over calling Supabase directly for user/role lookups.
+- Server actions: `app/actions.ts` (`logout`), `app/login/actions.ts` (`login`), `app/signup/actions.ts` (`signup`), `app/admin/actions.ts` (`setUserRole`, `deleteUser`). Both admin actions re-check `requireRole("admin")` themselves — role authorization for admin mutations happens at the action, not the proxy.
 
 ### Database
 
-Prisma owns the schema. `prisma/schema.prisma` defines 3 enums (`Role`→`user_role`, `RestaurantStatus`→`restaurant_status`, `BookingStatus`→`booking_status`) and 6 models (`Profile`→`profiles`, `Restaurant`→`restaurants`, `Booking`→`bookings`, `OpeningHour`→`opening_hours`, `BookingSetting`→`booking_settings`, `Closure`→`closures`), all mapped to snake_case tables/columns via `@@map`/`@map`. Migrations `prisma/migrations/20260812103854_init` and `20260815145650_add_booking_status_reason` (`Booking.statusReason`) are applied to the live DB.
+Prisma owns the schema. `prisma/schema.prisma` defines 3 enums (`Role`→`user_role`, `RestaurantStatus`→`restaurant_status`, `BookingStatus`→`booking_status`) and 6 models (`Profile`→`profiles`, `Restaurant`→`restaurants`, `Booking`→`bookings`, `OpeningHour`→`opening_hours`, `BookingSetting`→`booking_settings`, `Closure`→`closures`), all mapped to snake_case tables/columns via `@@map`/`@map`. See `prisma/migrations/` for the full, current migration history — don't hardcode a specific list here again, it will just go stale the next time a migration is added (this list itself used to name only the first 2 of what are now 5 migrations).
 
-`supabase/rls-and-triggers.sql` holds what Prisma can't express: SELECT-only RLS policies (see the file's header comment for why writes are deliberately not covered — all writes go through API routes + Prisma, which bypasses RLS), the `auth_user_role()` security-definer helper, and the `protect_profile_role`/`protect_restaurant_approval` triggers. Re-apply it in full (Supabase SQL Editor or `psql "$DIRECT_URL" -f supabase/rls-and-triggers.sql`) after any migration that changes table shape. **As of the last migration it had been written but not yet applied** — until it is, every table has RLS enabled with zero policies (Supabase's project default), i.e. deny-all even for `SELECT`.
+`supabase/rls-and-triggers.sql` holds what Prisma can't express: SELECT-only RLS policies (see the file's header comment for why writes are deliberately not covered — all writes go through API routes + Prisma, which bypasses RLS), the `auth_user_role()` security-definer helper, and the `protect_profile_role`/`protect_restaurant_approval` triggers. It **is applied** to the live DB (verified via `pg_policies` — 8 SELECT policies across `profiles`/`restaurants`/`bookings`). Re-apply it in full (Supabase SQL Editor or `psql "$DIRECT_URL" -f supabase/rls-and-triggers.sql`) after any migration that changes table shape.
 
-Auth needs `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY`; Prisma needs `DATABASE_URL` (pooled) / `DIRECT_URL` (direct) — all four are in `.env.local`. `SUPABASE_SERVICE_ROLE_KEY` is still missing, needed for `lib/supabase/admin.ts` and the not-yet-written profile-creation/deletion code (see "ปัญหาค้างที่ยังไม่แก้").
+Auth needs `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY`; Prisma needs `DATABASE_URL` (pooled) / `DIRECT_URL` (direct); admin operations (`lib/supabase/admin.ts`) need `SUPABASE_SERVICE_ROLE_KEY` — all five are in `.env.local` (see `.env.example` for the exact names).
 
 ### UI components
 
@@ -673,18 +659,18 @@ z-index เทียบกันได้แค่ภายใน stacking conte
 เคยเกิดจริงกับ hero section ใน `app/page.tsx` ที่ก็อปมาจาก Tailwind UI
 template — ตรวจทุกครั้งที่เอา decorative element จากที่อื่นมาใช้
 
-## Target folder structure
+## Folder structure
 
-No `src/`. `modules/`, `types/`, `constants/` exist but are still empty — no business-logic files have been written yet.
+No `src/`. `types/` is still genuinely empty (nothing has needed a project-wide shared type yet — module-local types live next to their service file instead); `modules/` and `constants/` are fully built out.
 
 ```
 app/           pages + API routes
 components/    ui/ (shadcn) + app-specific components
 lib/           prisma.ts, supabase/, api-response.ts, dal.ts, utils.ts
-modules/       business logic, one subtree per feature   ← empty, not yet used
-types/                                                    ← empty, not yet used
-constants/                                                ← empty, not yet used
-prisma/        schema.prisma, migrations/20260812103854_init
+modules/       business logic — auth/, restaurant/, booking/, admin/ (one subtree per feature)
+types/                                                    ← still empty
+constants/     messages.ts — every Thai user-facing string in the app
+prisma/        schema.prisma, migrations/
 supabase/      rls-and-triggers.sql — RLS policies / security-definer functions / triggers only
 ```
 

@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { Role as PrismaRole } from "@prisma/client";
 import { requireRole, type Role } from "@/lib/dal";
@@ -8,6 +9,8 @@ import * as userService from "@/modules/admin/user.service";
 import { listUsersQuerySchema, type ListUsersQuery } from "@/modules/admin/admin.schema";
 import { UserSearchControls } from "./user-search-controls";
 import { AdminUserTable, type AdminUserRow } from "./admin-user-table";
+
+export const metadata: Metadata = { title: MESSAGES.nav.adminPanel };
 
 function buildPageHref(query: ListUsersQuery, page: number): string {
   const params = new URLSearchParams();

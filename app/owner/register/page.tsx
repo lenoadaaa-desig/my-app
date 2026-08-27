@@ -1,6 +1,9 @@
+import type { Metadata } from "next";
 import { getProfile } from "@/lib/dal";
 import { MESSAGES } from "@/constants/messages";
 import { RegisterForm } from "./register-form";
+
+export const metadata: Metadata = { title: MESSAGES.owner.registerTitle };
 
 export default async function OwnerRegisterPage() {
   // Any logged-in profile can register a restaurant — POST /api/restaurants

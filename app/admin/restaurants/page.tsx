@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { RestaurantStatus } from "@prisma/client";
 import { requireRole } from "@/lib/dal";
@@ -9,6 +10,8 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { RestaurantStatusFilter } from "./status-filter";
+
+export const metadata: Metadata = { title: MESSAGES.admin.queueTitle };
 
 export default async function AdminRestaurantsPage({
   searchParams,

@@ -28,7 +28,7 @@ export function RestaurantStatusFilter({ status }: { status: ListRestaurantsQuer
         if (value) router.push(`/admin/restaurants?status=${value}`);
       }}
     >
-      <SelectTrigger className="w-48">
+      <SelectTrigger aria-label={MESSAGES.admin.statusFilterLabel} className="w-48">
         {/* Base UI's Select.Value doesn't auto-derive the matched Item's
             label (see app/restaurants/page.tsx's SelectValue for the same
             note) — without this children-function it would show the raw

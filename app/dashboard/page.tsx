@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { getProfile } from "@/lib/dal";
 import * as bookingService from "@/modules/booking/booking.service";
@@ -9,6 +10,8 @@ import { MESSAGES, ROLE_LABELS_TH } from "@/constants/messages";
 import { cn } from "@/lib/utils";
 
 const DASHBOARD_UPCOMING_COUNT = 3;
+
+export const metadata: Metadata = { title: MESSAGES.nav.dashboard };
 
 export default async function DashboardPage() {
   const profile = await getProfile();

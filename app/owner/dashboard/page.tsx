@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { RestaurantStatus } from "@prisma/client";
 import { getProfile } from "@/lib/dal";
@@ -9,6 +10,8 @@ import { RestaurantStatusBadge } from "@/components/restaurant-status-badge";
 import { MESSAGES } from "@/constants/messages";
 import { cn } from "@/lib/utils";
 import { DashboardView } from "./dashboard-view";
+
+export const metadata: Metadata = { title: MESSAGES.owner.dashboardTitle };
 
 export default async function OwnerDashboardPage({
   searchParams,

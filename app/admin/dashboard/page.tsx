@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { requireRole } from "@/lib/dal";
 import * as dashboardService from "@/modules/admin/dashboard.service";
@@ -8,6 +9,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { BookingStatusBadge } from "@/components/booking-status-badge";
 import { cn } from "@/lib/utils";
+
+export const metadata: Metadata = { title: MESSAGES.admin.dashboardOverviewTitle };
 
 // dashboard.service.ts's per-day trend is keyed by a "YYYY-MM-DD" string
 // (also used as a stable Map key while building the trend, so it isn't a

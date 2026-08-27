@@ -48,10 +48,11 @@ export function UserSearchControls({ q, role }: { q: string; role: string }) {
         value={searchInput}
         onChange={(e) => setSearchInput(e.target.value)}
         placeholder={MESSAGES.admin.userSearchPlaceholder}
+        aria-label={MESSAGES.admin.userSearchPlaceholder}
         className="sm:max-w-xs"
       />
       <Select value={role} onValueChange={(value) => value && router.push(buildHref(searchInput, value))}>
-        <SelectTrigger className="sm:w-48">
+        <SelectTrigger aria-label={MESSAGES.admin.userRoleFilterLabel} className="sm:w-48">
           {/* Base UI's Select.Value doesn't auto-derive the matched Item's
               label — see app/restaurants/page.tsx's SelectValue for the
               same note. */}

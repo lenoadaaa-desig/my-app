@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { CheckCircle2, XCircle, Clock, Ban } from "lucide-react";
 import { getProfile } from "@/lib/dal";
@@ -8,6 +9,8 @@ import { Badge } from "@/components/ui/badge";
 import { MESSAGES, RESTAURANT_STATUS_LABELS_TH } from "@/constants/messages";
 import { cn } from "@/lib/utils";
 import { ResubmitButton } from "./resubmit-button";
+
+export const metadata: Metadata = { title: MESSAGES.owner.statusTitle };
 
 function StatusStepper({ status }: { status: string }) {
   const resolved = status !== "PENDING";

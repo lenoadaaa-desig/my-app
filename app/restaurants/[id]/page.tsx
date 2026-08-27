@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { ChevronDown, UtensilsCrossed } from "lucide-react";
 import { getProfileOrNull } from "@/lib/dal";
@@ -8,6 +9,27 @@ import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { BookingBox } from "./booking-box";
+
+// getRestaurantById is cache()-wrapped (restaurant.service.ts) specifically
+// so this and the page component below share one query per request instead
+// of two — both must call it with the same (id, viewer) pair, with viewer
+// from the also-cache()-wrapped getProfileOrNull(), for the dedupe to hit.
+export async function generateMetadata({
+  params,
+}: PageProps<"/restaurants/[id]">): Promise<Metadata> {
+  const { id } = await params;
+  const viewer = await getProfileOrNull();
+  const restaurant = await restaurantService.getRestaurantById(id, viewer);
+
+  if (!restaurant) {
+    return { title: MESSAGES.restaurant.notFound };
+  }
+
+  return {
+    title: restaurant.name,
+    description: restaurant.description?.trim() || undefined,
+  };
+}
 
 export default async function RestaurantDetailPage({
   params,

@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { UtensilsCrossed, ChevronLeft } from "lucide-react";
@@ -10,6 +11,14 @@ import { MESSAGES, DAY_OF_WEEK_LABELS_TH } from "@/constants/messages";
 import { RestaurantStatusBadge } from "@/components/restaurant-status-badge";
 import { ReviewChecklist } from "./review-checklist";
 import { RestaurantReviewActions } from "./review-actions";
+
+// Static, not restaurant.name via generateMetadata — this is an admin-only
+// page (no SEO need per Task 9 phase 2's spec), and giving it its own
+// generateMetadata would mean a second getRestaurantForOwner() call here
+// alongside the one the page component below already makes (that function
+// isn't cache()-wrapped, unlike restaurant.service.ts's public
+// getRestaurantById — see app/restaurants/[id]/page.tsx for why that one is).
+export const metadata: Metadata = { title: MESSAGES.metadata.adminRestaurantDetailTitle };
 
 export default async function AdminRestaurantDetailPage({
   params,

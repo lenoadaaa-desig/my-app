@@ -253,6 +253,7 @@ function OpeningHoursTab({ restaurant }: { restaurant: OwnerRestaurant }) {
                     type="time"
                     value={row.openTime}
                     onChange={(e) => updateRow(row.dayOfWeek, { openTime: e.target.value })}
+                    aria-label={MESSAGES.owner.hoursOpenTimeLabel(DAY_OF_WEEK_LABELS_TH[row.dayOfWeek])}
                     className="w-28"
                   />
                   <span className="text-ink-mute">–</span>
@@ -260,6 +261,7 @@ function OpeningHoursTab({ restaurant }: { restaurant: OwnerRestaurant }) {
                     type="time"
                     value={row.closeTime}
                     onChange={(e) => updateRow(row.dayOfWeek, { closeTime: e.target.value })}
+                    aria-label={MESSAGES.owner.hoursCloseTimeLabel(DAY_OF_WEEK_LABELS_TH[row.dayOfWeek])}
                     className="w-28"
                   />
                 </div>

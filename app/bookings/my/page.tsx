@@ -1,7 +1,10 @@
+import type { Metadata } from "next";
 import { getProfile } from "@/lib/dal";
 import * as bookingService from "@/modules/booking/booking.service";
 import { MESSAGES } from "@/constants/messages";
 import { MyBookingsView } from "./my-bookings-view";
+
+export const metadata: Metadata = { title: MESSAGES.nav.myBookings };
 
 export default async function MyBookingsPage() {
   const profile = await getProfile(); // redirects to /login if not authenticated

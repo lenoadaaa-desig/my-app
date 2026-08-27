@@ -14,7 +14,10 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "TableNow",
+  title: {
+    default: "TableNow",
+    template: "%s | TableNow",
+  },
   description: "แพลตฟอร์มจองโต๊ะร้านอาหารออนไลน์",
 };
 

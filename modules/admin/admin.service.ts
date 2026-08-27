@@ -46,7 +46,7 @@ export type RestaurantWithOwner = Restaurant & {
 // the useful order. reviewedAt is null for every PENDING row and, in the
 // ordinary app flow, only for PENDING rows — every other status is reached
 // exclusively through reviewRestaurant(), which always sets it. Fixture
-// data can violate that (npm run db:seed inserts rows as APPROVED directly,
+// data can violate that (npm run seed:demo inserts rows as APPROVED directly,
 // bypassing reviewRestaurant() and its reviewedAt write), so `nulls: "last"`
 // is explicit rather than relying on Postgres's default NULLS FIRST for
 // DESC — confirmed by querying against the seeded data, whose 3 null-

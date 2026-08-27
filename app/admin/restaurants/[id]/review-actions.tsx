@@ -180,9 +180,9 @@ export function RestaurantReviewActions({
 
           <div className="flex flex-col gap-3">
             <div className="flex flex-col gap-1.5">
-              <Label>{MESSAGES.admin.rejectReasonSelectLabel}</Label>
+              <Label htmlFor="reject-reason-select">{MESSAGES.admin.rejectReasonSelectLabel}</Label>
               <Select value={rejectReasonValue} onValueChange={(v) => v && setRejectReasonValue(v)}>
-                <SelectTrigger className="w-full">
+                <SelectTrigger id="reject-reason-select" className="w-full">
                   {/* Base UI's Select.Value renders the raw `value` by
                       default (unlike Radix, it does NOT auto-derive the
                       matched Item's label) — see app/restaurants/page.tsx's
@@ -206,12 +206,16 @@ export function RestaurantReviewActions({
             </div>
 
             {rejectReasonValue === "other" && (
-              <Textarea
-                value={rejectOtherText}
-                onChange={(e) => setRejectOtherText(e.target.value)}
-                placeholder={MESSAGES.admin.rejectReasonOtherPlaceholder}
-                rows={3}
-              />
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="reject-reason-other">{MESSAGES.admin.rejectReasonOtherLabel}</Label>
+                <Textarea
+                  id="reject-reason-other"
+                  value={rejectOtherText}
+                  onChange={(e) => setRejectOtherText(e.target.value)}
+                  placeholder={MESSAGES.admin.rejectReasonOtherPlaceholder}
+                  rows={3}
+                />
+              </div>
             )}
 
             {error && <p className="text-sm text-bad">{errorText(error)}</p>}

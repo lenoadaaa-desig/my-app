@@ -1,5 +1,6 @@
 import "server-only";
 
+import { cache } from "react";
 import {
   Prisma,
   Role as PrismaRole,
@@ -198,7 +199,13 @@ export type RestaurantWithOpeningHours = Restaurant & {
   openingHours: { dayOfWeek: number; openTime: string; closeTime: string; isClosed: boolean }[];
 };
 
-export async function getRestaurantById(
+// Wrapped in React's cache() so /restaurants/[id]'s generateMetadata and its
+// page component — two separate function calls Next.js makes for the same
+// request — share one query instead of two, as long as both call this with
+// the same (id, viewer) pair. viewer must come from getProfileOrNull()
+// (also cache()-wrapped in lib/dal.ts), not re-derived some other way, or
+// the two calls get different object references and the dedupe misses.
+export const getRestaurantById = cache(async function getRestaurantById(
   id: string,
   viewer: Profile | null
 ): Promise<RestaurantWithOpeningHours | null> {
@@ -223,7 +230,7 @@ export async function getRestaurantById(
   // Not visible to this viewer — treated the same as not existing, so a
   // pending/rejected restaurant's existence isn't leaked to strangers.
   return null;
-}
+});
 
 // /owner/settings needs bookingSetting too (for the booking-rules form),
 // which getRestaurantById above deliberately doesn't include — that
